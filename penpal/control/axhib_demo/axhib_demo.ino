@@ -15,7 +15,7 @@ Bounce bounce = Bounce();
 
 const uint8_t DXL0 = 1;
 const uint8_t DXL1 = 4;
-const uint8_t DXL2 = 5;
+const uint8_t DXL2 = 7;
 const float DXL_PROTOCOL_VERSION = 2.0;
 DynamixelShield dxl;
 
@@ -161,16 +161,16 @@ void loop() {
         if (cur1 < 15.0){cur1 = 15.0;}
         cur2 = cur2 - slow_count;
         if (cur2 < 15.0){cur2 = 15.0;}
-        dxl.setGoalPosition(1, cur0, UNIT_DEGREE);
-        dxl.setGoalPosition(4, cur1, UNIT_DEGREE);
-        dxl.setGoalPosition(5, cur2, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, cur0, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, cur1, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, cur2, UNIT_DEGREE);
         slow_count += 0.01;
         // Serial.print(cur0);Serial.print("\t");Serial.print(cur1);Serial.print("\t");Serial.println(cur2);
         break;
       case 1:
-        dxl.setGoalPosition(1, 5.0+count, UNIT_DEGREE);
-        dxl.setGoalPosition(4, 5.0+count, UNIT_DEGREE);
-        dxl.setGoalPosition(5, 5.0+count, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, 5.0+count, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, 5.0+count, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, 5.0+count, UNIT_DEGREE);
         count+=15;
         if (count > 60){count = 60; state = 2;count = 0; INTERVAL = 60;}
         break;
@@ -180,64 +180,64 @@ void loop() {
         }
         if (count == 0){
           // DEBUG_SERIAL.println(0);
-          dxl.setGoalPosition(1, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 40.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 40.0, UNIT_DEGREE);
         }
         else if (count == 1){
           // DEBUG_SERIAL.println(1);
-          dxl.setGoalPosition(1, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 20.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 20.0, UNIT_DEGREE);
         }
         else if (count == 2){
           // DEBUG_SERIAL.println(2);
-          dxl.setGoalPosition(1, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 40.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 40.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 60.0, UNIT_DEGREE);
         }
         else if (count == 3){
           // DEBUG_SERIAL.println(3);
-          dxl.setGoalPosition(1, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 20.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 20.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 60.0, UNIT_DEGREE);
         }
         else if (count == 4){
           // DEBUG_SERIAL.println(4);
-          dxl.setGoalPosition(1, 40.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 40.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 60.0, UNIT_DEGREE);
         }
         else if (count == 5){
           // DEBUG_SERIAL.println(5);
-          dxl.setGoalPosition(1, 20.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 60.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 20.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 60.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 60.0, UNIT_DEGREE);
         }
         count++;
         break;
       case 3:
-        dxl.setGoalPosition(1, sine[count0]-60, UNIT_DEGREE);
-        dxl.setGoalPosition(4, sine[count1]-60, UNIT_DEGREE);
-        dxl.setGoalPosition(5, sine[count2]-60, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, sine[count0]-60, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, sine[count1]-60, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, sine[count2]-60, UNIT_DEGREE);
         count0++; count1++; count2++;
         if (count0>35){count0=0;}
         if (count1>35){count1=0;}
         if (count2>35){count2=0;}
         break;
       case 4:
-        dxl.setGoalPosition(1, sine2[count0]-40, UNIT_DEGREE);
-        dxl.setGoalPosition(4, sine2[count1]-40, UNIT_DEGREE);
-        dxl.setGoalPosition(5, sine2[count2]-40, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, sine2[count0]-40, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, sine2[count1]-40, UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, sine2[count2]-40, UNIT_DEGREE);
         count0++; count1++; count2++;
         if (count0>35){count0=0;}
         if (count1>35){count1=0;}
         if (count2>35){count2=0;}
         break;
       case 5:
-        dxl.setGoalPosition(1, sine3[count0]+random(-15,15), UNIT_DEGREE);
-        dxl.setGoalPosition(4, sine3[count1]+random(-15,15), UNIT_DEGREE);
-        dxl.setGoalPosition(5, sine3[count2]+random(-15,15), UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, sine3[count0]+random(-15,15), UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, sine3[count1]+random(-15,15), UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, sine3[count2]+random(-15,15), UNIT_DEGREE);
         count0++; count1++; count2++;
         if (count0>17){count0=0;}
         if (count1>17){count1=0;}
@@ -249,21 +249,21 @@ void loop() {
       else if (spread < 200){spread = 200;}
       spread = map(spread, 200, 600, 80.0, 20.0);
         if (count%2 == 0){
-          dxl.setGoalPosition(5, spread, UNIT_DEGREE);
-          dxl.setGoalPosition(1, 80.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, spread, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 80.0, UNIT_DEGREE);
         }
         else{
-          dxl.setGoalPosition(5, 80.0, UNIT_DEGREE);
-          dxl.setGoalPosition(1, spread, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, spread, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 80.0, UNIT_DEGREE);
         }
         count++;
         break;
       case 7:
-        dxl.setGoalPosition(1, cat[count][0], UNIT_DEGREE);
-        dxl.setGoalPosition(4, cat[count][1], UNIT_DEGREE);
-        dxl.setGoalPosition(5, cat[count][2], UNIT_DEGREE);
+        dxl.setGoalPosition(DXL0, cat[count][0], UNIT_DEGREE);
+        dxl.setGoalPosition(DXL1, cat[count][1], UNIT_DEGREE);
+        dxl.setGoalPosition(DXL2, cat[count][2], UNIT_DEGREE);
         count++;
         if (count > 99){count = 0;}
         break;
@@ -273,14 +273,14 @@ void loop() {
           pedro = true;
         }  
         if (pedro == false){
-          dxl.setGoalPosition(1, 80.0, UNIT_DEGREE);
-          dxl.setGoalPosition(4, 80.0, UNIT_DEGREE);
-          dxl.setGoalPosition(5, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, 80.0, UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, 80.0, UNIT_DEGREE);
         }
         else{
-          dxl.setGoalPosition(1, random(30, 80), UNIT_DEGREE);
-          dxl.setGoalPosition(4, random(30, 80), UNIT_DEGREE);
-          dxl.setGoalPosition(5, random(30, 80), UNIT_DEGREE);
+          dxl.setGoalPosition(DXL0, random(30, 80), UNIT_DEGREE);
+          dxl.setGoalPosition(DXL1, random(30, 80), UNIT_DEGREE);
+          dxl.setGoalPosition(DXL2, random(30, 80), UNIT_DEGREE);
           pedro = false;
         }
         count++;
