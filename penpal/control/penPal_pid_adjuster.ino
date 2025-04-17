@@ -17,26 +17,29 @@ const uint8_t DXL2 = 7;
 const uint32_t DXL_BAUDRATE = 57600;
 const float DXL_PROTOCOL_VERSION = 2.0;
 int count = 0;
-
-float goal_position[27] = {60,61,62,63,64,65,66,67,68,69,70,73,76,79,76,73,70,76,82,88,82,76,70,120,70,120,70};
+int routine = 0;
+int tuneFlag = 1;
+// float goal_position[27] = {60,61,62,63,64,65,66,67,68,69,70,73,76,79,76,73,70,76,82,88,82,76,70,120,70,120,70};
 float wave[16] = {60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75};
-float wave1[16] = {60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90};
+float wave1[16] = {60,63,66,69,72,75,78,81,84,87,90,93,96,99,102,105};
+float wave2[16] = {99,93,87,81,75,69,63,57,63,69,75,81,87,93,99,105};
+float wave3[16] = {120,60,120,60,120,60,120,60,120,60,120,60,120,60,120,60};
 int8_t direction = 0;
 unsigned long timer = 0;
 // Position PID Gains
 // Adjust these gains to tune the behavior of DYNAMIXEL
 
 //default:
-// uint16_t p_gains[3] = {400,400,400};
-// uint16_t i_gains[3] = {0,0,0};
-// uint16_t d_gains[3] = {0,0,0};
+uint16_t p_gains[3] = {400,400,400};
+uint16_t i_gains[3] = {0,0,0};
+uint16_t d_gains[3] = {0,0,0};
 //for M077:
 // uint16_t p_gains[3] = {670,400,400};
 // uint16_t i_gains[3] = {50,0,0};
 // uint16_t d_gains[3] = {400,0,0};
-uint16_t p_gains[3] = {1500,400,400};
-uint16_t i_gains[3] = {80,0,0};
-uint16_t d_gains[3] = {500,0,0};
+// uint16_t p_gains[3] = {1500,400,400};
+// uint16_t i_gains[3] = {80,0,0};
+// uint16_t d_gains[3] = {500,0,0};
 //for M288:
 // uint16_t p_gains[3] = {650,650,650};
 // uint16_t i_gains[3] = {80,80,80};
@@ -126,11 +129,72 @@ void loop() {
     //   if (count>15){count=0;}
     // }
     if (millis() - timer >= 50){
-      tunePID();
-      dxl.setGoalPosition(DXL0, goal_position[count], UNIT_DEGREE);
-      timer = millis();
-      count++;
-      if (count>26){count=0;}
+      switch(routine){
+        case 0:
+          if (count == 0){
+            tunePID(wave3[15],wave[0]);
+          }
+          else{
+            tunePID(wave[count-1], wave[count]);
+          }
+          dxl.setGoalPosition(DXL0, wave[count], UNIT_DEGREE);
+          timer = millis();
+          count++;
+          if (count>15){
+            count=0;
+            routine = 1;
+          }
+          break;
+        case 1:
+          if (count == 0){
+            tunePID(wave[15],wave1[0]);
+          }
+          else{
+            tunePID(wave1[count-1], wave1[count]);
+          }
+          dxl.setGoalPosition(DXL0, wave1[count], UNIT_DEGREE);
+          timer = millis();
+          count++;
+          if (count>15){
+            count=0;
+            routine = 2;
+          }
+          break;
+        case 2:
+          if (count == 0){
+            tunePID(wave1[15],wave2[0]);
+          }
+          else{
+            tunePID(wave2[count-1], wave2[count]);
+          }
+          dxl.setGoalPosition(DXL0, wave2[count], UNIT_DEGREE);
+          timer = millis();
+          count++;
+          if (count>15){
+            count=0;
+            routine = 3;
+          }
+          break;
+        case 3:
+          if (count == 0){
+            tunePID(wave2[15],wave3[0]);
+          }
+          else{
+            tunePID(wave3[count-1], wave3[count]);
+          }
+          dxl.setGoalPosition(DXL0, wave3[count], UNIT_DEGREE);
+          timer = millis();
+          count++;
+          if (count>15){
+            count=0;
+            routine = 0;
+          }
+          break;
+      }
+      // dxl.setGoalPosition(DXL0, goal_position[count], UNIT_DEGREE);
+      // timer = millis();
+      // count++;
+      // if (count>26){count=0;}
     }
   }
   
@@ -150,29 +214,31 @@ void loop() {
   // }
 }
 
-void tunePID(){
-  if (abs(goal_position[count-1]-goal_position[count])>5.0){
-    p_gains[0] = 670;
-    p_gains[1] = 400;
-    p_gains[2] = 400;
-    i_gains[0] = 50;
-    i_gains[1] = 0;
-    i_gains[1] = 0;
-    d_gains[0] = 400;
-    d_gains[1] = 0;
-    d_gains[2] = 0;
-  } else{
-    p_gains[0] = 1800;
-    p_gains[1] = 400;
-    p_gains[2] = 400;
-    i_gains[0] = 80;
-    i_gains[1] = 0;
-    i_gains[1] = 0;
-    d_gains[0] = 500;
-    d_gains[1] = 0;
-    d_gains[2] = 0;
+void tunePID(float goal, float cur){
+  if (tuneFlag == 1){
+    if (abs(cur-goal)>5.0){
+      p_gains[0] = 670;
+      p_gains[1] = 400;
+      p_gains[2] = 400;
+      i_gains[0] = 50;
+      i_gains[1] = 0;
+      i_gains[1] = 0;
+      d_gains[0] = 400;
+      d_gains[1] = 0;
+      d_gains[2] = 0;
+    } else{
+      p_gains[0] = 1800;
+      p_gains[1] = 400;
+      p_gains[2] = 400;
+      i_gains[0] = 80;
+      i_gains[1] = 0;
+      i_gains[1] = 0;
+      d_gains[0] = 500;
+      d_gains[1] = 0;
+      d_gains[2] = 0;
+    }
+    writeGains();
   }
-  writeGains();
 }
 
 void writeGains(){
