@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
 
 # Load dataset
-df = pd.read_csv("cartesian.csv")
+df = pd.read_csv("April Mapping - real sheet.csv")
 
 # Prepare data
 X = df[["X", "Y"]]
@@ -41,6 +41,6 @@ for x in x_range:
 
 # Save lookup table to CSV
 lookup_df = pd.DataFrame(lookup_table, columns=["X", "Y", "servo_0", "servo_1", "servo_2"])
-lookup_df.to_csv("lookup_table.csv", index=False)
+lookup_df.to_csv("lookup_table_APRIL.csv", index=False)
 
-print("Lookup table generated and saved as 'lookup_table.csv'")
+print("Lookup table generated and saved as 'lookup_table_APRIL.csv'")

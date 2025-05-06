@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import cv2
 import svgpathtools
+from svgpathtools import svg2paths, Path, wsvg
 from scipy.spatial import KDTree
 
 lookup_df = pd.read_csv("lookup_table.csv")
@@ -39,6 +40,7 @@ def extract_svg_paths(svg_file):
     paths, _ = svgpathtools.svg2paths(svg_file)
     coordinates = []
     for path in paths:
+        wsvg([path], filename='kitten_path.svg')
         for i in np.linspace(0, 1, num=100):  # Sample points along the path
             point = path.point(i)
             coordinates.append((float(point.real), float(point.imag)))  # Ensure float conversion
@@ -62,9 +64,10 @@ def generate_motion_path(coordinates):
     return motion_path
 
 # Example usage
-svg_file = "star.svg"  # Replace with actual file
+svg_file = "cat.svg"  # Replace with actual file
+output_file = "kitten_segmentwise.txt" # Replace with desired output file
 coordinates = extract_svg_paths(svg_file)
-'''
+
 int_coords = []
 for i in coordinates:
     temp_list = []
@@ -76,7 +79,7 @@ for i in int_coords:
 print("spacer____________")
 for i in int_coords:
     print(i[1])
-'''    
+ 
 motion_path = generate_motion_path(coordinates)
 mod_motion = []
 for i in motion_path:
@@ -85,6 +88,17 @@ for i in motion_path:
         temp_list.append(int(f))
     mod_motion.append(temp_list)
     
-# print("Generated Servo Motion Path:")
-# print(motion_path)
-print(mod_motion)
+print("Generated Servo Motion Path:")
+print("length: ", len(mod_motion))
+
+# Convert each sublist to a string with {} formatting
+formatted = [f"{{{x}, {y}, {z}}}" for x, y, z in mod_motion]
+
+# Break into chunks of 8
+lines = [', '.join(formatted[i:i+8]) for i in range(0, len(formatted), 8)]
+
+# Join lines with line breaks and wrap in outer braces
+final_string = "{" + ",".join(lines) + "}"
+
+with open(output_file, "w") as f:
+    f.write(final_string)
