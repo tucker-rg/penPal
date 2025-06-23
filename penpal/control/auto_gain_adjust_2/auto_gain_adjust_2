@@ -4,6 +4,8 @@ This version of the control code boosts the gains like the other "adaptive gain"
 "hits" to "timeouts," most of the time it timed out before getting within the tolerance I set.)
 
 This also automatically resets the motors if the red LED starts blinking. This is an iffy choice on my part.
+
+NOTE THAT THE GAINS ARE SET FOR THE 077 MOTORS (the ones on the new pen, not the old pen).
 */
 
 #include <DynamixelShield.h>
