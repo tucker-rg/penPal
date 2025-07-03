@@ -22,19 +22,42 @@ void setup() {
      .setPosition(150, 50)
      .setSize(100, 30)
      .setText(str(input_0))
-     .setAutoClear(false);
+     .setAutoClear(false)
+     .setBroadcast(false);  // Prevent automatic variable setting
   
   cp5.addTextfield("input_1")
      .setPosition(150, 100)
      .setSize(100, 30)
      .setText(str(input_1))
-     .setAutoClear(false);
+     .setAutoClear(false)
+     .setBroadcast(false);
   
   cp5.addTextfield("input_2")
      .setPosition(150, 150)
      .setSize(100, 30)
      .setText(str(input_2))
-     .setAutoClear(false);
+     .setAutoClear(false)
+     .setBroadcast(false);
+
+  cp5.get(Textfield.class, "input_0").onChange(e -> {
+    input_0 = parseFloat(e.getController().getStringValue());
+    println("manual input_0: " + input_0);
+    sendValuesToArduino();
+  });
+  
+  cp5.get(Textfield.class, "input_1").onChange(e -> {
+    input_1 = parseFloat(e.getController().getStringValue());
+    println("manual input_1: " + input_1);
+    sendValuesToArduino();
+  });
+  
+  cp5.get(Textfield.class, "input_2").onChange(e -> {
+    input_2 = parseFloat(e.getController().getStringValue());
+    println("manual input_2: " + input_2);
+    sendValuesToArduino();
+  });
+
+
 }
 
 void draw() {
@@ -53,7 +76,14 @@ void draw() {
 
 // Handle keyboard input
 void keyPressed() {
-  float step = 1.0; // Adjust the step size if needed
+  // Ignore keys if a text field is active
+  if (cp5.get(Textfield.class, "input_0").isFocus() ||
+      cp5.get(Textfield.class, "input_1").isFocus() ||
+      cp5.get(Textfield.class, "input_2").isFocus()) {
+    return;
+  }
+
+  float step = 1.0;
 
   if (key == 'w' || key == 'W') input_0 += step;
   if (key == 's' || key == 'S') input_0 -= step;
@@ -66,19 +96,13 @@ void keyPressed() {
   sendValuesToArduino();
 }
 
+
+
 // Handle manual entry
-void controlEvent(ControlEvent event) {
-  if (event.isAssignableFrom(Textfield.class)) {
-    try {
-      if (event.getName().equals("input_0")) input_0 = Float.parseFloat(event.getStringValue());
-      if (event.getName().equals("input_1")) input_1 = Float.parseFloat(event.getStringValue());
-      if (event.getName().equals("input_2")) input_2 = Float.parseFloat(event.getStringValue());
-      sendValuesToArduino();
-    } catch (NumberFormatException e) {
-      println("Invalid input");
-    }
-  }
-}
+
+
+
+
 
 // Send formatted data to Arduino
 void sendValuesToArduino() {

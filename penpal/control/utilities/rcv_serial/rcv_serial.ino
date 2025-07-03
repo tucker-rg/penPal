@@ -31,7 +31,7 @@ float input_2 = 0.0;
 
 void setup() {
   Serial.begin(57600);  // For communication with Processing
-  dxl.begin(57600);
+  dxl.begin(1000000); // instead of 57600
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
   dxl.ping(DXL0);
@@ -81,8 +81,8 @@ void parseReceivedData(String data) {
     input_1 = data.substring(index1 + 2, index2 - 1).toFloat();
     input_2 = data.substring(index2 + 2).toFloat();
 
-    // Serial.print("Received - Input 0: "); Serial.print(input_0);
-    // Serial.print(", Input 1: "); Serial.print(input_1);
-    // Serial.print(", Input 2: "); Serial.println(input_2);
+    Serial.print("Received - Input 0: "); Serial.print(input_0);
+    Serial.print(", Input 1: "); Serial.print(input_1);
+    Serial.print(", Input 2: "); Serial.println(input_2);
   }
 }
