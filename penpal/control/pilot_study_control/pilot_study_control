@@ -13,12 +13,9 @@ Bounce b5 = Bounce();
 Bounce b6 = Bounce();
 
 int modeSwState = LOW;
-int b1State = LOW;
-int b2State = LOW;
-int b3State = LOW;
-int b4State = LOW;
-int b5State = LOW;
-int b6State = LOW;
+
+long encoderPosition;
+long oldPosition;
 
 const uint8_t BUTTON_PINS[NUM_BUTTONS] = {13,11,12,10,14,9};
 Bounce * buttons = new Bounce[NUM_BUTTONS];
@@ -39,35 +36,42 @@ void setup() {
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP);
     buttons[i].interval(5);   
   }
-
+  encoderPosition = myEnc.read();
+  oldPosition = encoderPosition;
 }
-
-long oldPosition  = -999;
 
 void loop() {
   long newPosition = myEnc.read();
-  if (newPosition != oldPosition) {
+  if (newPosition - oldPosition == -4) {
     oldPosition = newPosition;
-    // Serial.println(newPosition);
+    encoderPosition++;
+  }
+  else if (newPosition - oldPosition == 4){
+    oldPosition = newPosition;
+    encoderPosition--;
   }
   checkButtons();
-  // for (int i = 0; i < NUM_BUTTONS; i++){
-  //   Serial.print(BUTTON_STATES[i].state); Serial.print("\t");
-  //   Serial.print(abs(BUTTON_STATES[i].stop - BUTTON_STATES[i].start)); Serial.print("\t");
-  // }
-  Serial.print(BUTTON_STATES[0].state); Serial.print("\t");
-  Serial.print(BUTTON_STATES[0].start); Serial.print("\t");
-  Serial.print(BUTTON_STATES[0].stop); Serial.print("\t");
-  Serial.print(BUTTON_STATES[0].duration);
+  Serial.print(modeSwState); Serial.print("\t");
+  if (modeSwState == 0){
+    for (int i = 0; i < NUM_BUTTONS; i++){
+      // Serial.print(BUTTON_STATES[i].state); Serial.print("\t");
+      Serial.print(BUTTON_STATES[i].duration); Serial.print("\t");
+    }
+  }
+  else{
+    Serial.print(encoderPosition); Serial.print("\t");
+  }
+  // Serial.print(BUTTON_STATES[0].state); Serial.print("\t");
+  // Serial.print(BUTTON_STATES[0].start); Serial.print("\t");
+  // Serial.print(BUTTON_STATES[0].stop); Serial.print("\t");
+  // Serial.print(BUTTON_STATES[0].duration);
   Serial.println();
   
 }
 
 void checkButtons(){
   modeSw.update();
-  if (modeSw.changed()) {
-    modeSwState = modeSw.read();
-  }
+  modeSwState = modeSw.read();
   for (int i = 0; i < NUM_BUTTONS; i++)  {
     // Update the Bounce instance :
     buttons[i].update();
