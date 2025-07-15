@@ -7,6 +7,8 @@ Encoder myEnc(6, 7);
 Bounce modeSw = Bounce();
 
 int modeSwState = LOW;
+int buttonFocus;
+long latestStart = 0;
 
 long encoderPosition;
 long oldPosition;
@@ -35,6 +37,25 @@ void setup() {
 }
 
 void loop() {
+  checkEncoder();
+  modeSw.update();
+  modeSwState = modeSw.read();
+  Serial.print(modeSwState); Serial.print("\t");
+  if (modeSwState == 0){
+    checkButtons();
+    for (int i = 0; i < NUM_BUTTONS; i++){
+      // Serial.print(BUTTON_STATES[i].state); Serial.print("\t");
+      Serial.print(BUTTON_STATES[i].duration); Serial.print("\t");
+    }
+
+  }
+  else{
+    Serial.print(encoderPosition); Serial.print("\t");
+  }
+  Serial.println(buttonFocus);
+}
+
+void checkEncoder(){
   long newPosition = myEnc.read();
   if (newPosition - oldPosition == -4) {
     oldPosition = newPosition;
@@ -44,34 +65,19 @@ void loop() {
     oldPosition = newPosition;
     encoderPosition--;
   }
-  checkButtons();
-  Serial.print(modeSwState); Serial.print("\t");
-  if (modeSwState == 0){
-    for (int i = 0; i < NUM_BUTTONS; i++){
-      // Serial.print(BUTTON_STATES[i].state); Serial.print("\t");
-      Serial.print(BUTTON_STATES[i].duration); Serial.print("\t");
-    }
-  }
-  else{
-    Serial.print(encoderPosition); Serial.print("\t");
-  }
-  // Serial.print(BUTTON_STATES[0].state); Serial.print("\t");
-  // Serial.print(BUTTON_STATES[0].start); Serial.print("\t");
-  // Serial.print(BUTTON_STATES[0].stop); Serial.print("\t");
-  // Serial.print(BUTTON_STATES[0].duration);
-  Serial.println();
-  
 }
 
 void checkButtons(){
-  modeSw.update();
-  modeSwState = modeSw.read();
   for (int i = 0; i < NUM_BUTTONS; i++)  {
     // Update the Bounce instance :
     buttons[i].update();
     if (buttons[i].fell()){
       BUTTON_STATES[i].state = 1;
       BUTTON_STATES[i].start = millis();
+      if (BUTTON_STATES[i].start >= latestStart){
+        latestStart = BUTTON_STATES[i].start;
+        buttonFocus = i;
+      }
     } 
     else if(buttons[i].rose()){
       BUTTON_STATES[i].state = 0;
