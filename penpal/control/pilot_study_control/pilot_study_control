@@ -1,0 +1,96 @@
+#include <Encoder.h>
+#include <Bounce2.h>
+
+Encoder myEnc(6, 7);
+Bounce modeSw = Bounce();
+Bounce b1 = Bounce();
+Bounce b2 = Bounce();
+Bounce b3 = Bounce();
+Bounce b4 = Bounce();
+Bounce b5 = Bounce();
+Bounce b6 = Bounce();
+
+int modeSwState = LOW;
+int b1State = LOW;
+int b2State = LOW;
+int b3State = LOW;
+int b4State = LOW;
+int b5State = LOW;
+int b6State = LOW;
+
+void setup() {
+  Serial.begin(115200);
+  modeSw.attach(8, INPUT_PULLUP);
+  b1.attach(13, INPUT_PULLUP);
+  b2.attach(11, INPUT_PULLUP);
+  b3.attach(12, INPUT_PULLUP);
+  b4.attach(10, INPUT_PULLUP);
+  b5.attach(14, INPUT_PULLUP);
+  b6.attach(9, INPUT_PULLUP);
+  b1.interval(5); b2.interval(5); b3.interval(5); b4.interval(5); b5.interval(5); b6.interval(5);
+}
+
+long oldPosition  = -999;
+
+void loop() {
+  modeSw.update(); b1.update(); b2.update(); b3.update(); b4.update(); b5.update(); b6.update();
+  long newPosition = myEnc.read();
+  if (newPosition != oldPosition) {
+    oldPosition = newPosition;
+    Serial.println(newPosition);
+  }
+  checkButtons();
+  Serial.print(modeSwState); Serial.print("\t");
+  Serial.print(b1State); Serial.print("\t");
+  Serial.print(b2State); Serial.print("\t");
+  Serial.print(b3State); Serial.print("\t");
+  Serial.print(b4State); Serial.print("\t");
+  Serial.print(b5State); Serial.print("\t");
+  Serial.print(b6State); Serial.print("\n");
+  
+}
+
+void checkButtons(){
+  if (modeSw.changed()) {
+    int debouncedInput = modeSw.read();
+    if (debouncedInput == LOW) {
+      modeSwState = !modeSwState;
+    }
+  }
+  if (b1.changed()) {
+    int debouncedInput = b1.read();
+    if (debouncedInput == LOW) {
+      b1State = !b1State;
+    }
+  }
+  if (b2.changed()) {
+    int debouncedInput = b2.read();
+    if (debouncedInput == LOW) {
+      b2State = !b2State;
+    }
+  }
+  if (b3.changed()) {
+    int debouncedInput = b3.read();
+    if (debouncedInput == LOW) {
+      b3State = !b3State;
+    }
+  }
+  if (b4.changed()) {
+    int debouncedInput = b4.read();
+    if (debouncedInput == LOW) {
+      b4State = !b4State;
+    }
+  }
+  if (b5.changed()) {
+    int debouncedInput = b5.read();
+    if (debouncedInput == LOW) {
+      b5State = !b5State;
+    }
+  }
+  if (b6.changed()) {
+    int debouncedInput = b6.read();
+    if (debouncedInput == LOW) {
+      b6State = !b6State;
+    }
+  }
+}
