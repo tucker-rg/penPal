@@ -25,7 +25,9 @@ Bounce * buttons = new Bounce[NUM_BUTTONS];
 
 struct buttonState{
   byte state = 0;
-  long timestamp;
+  unsigned long start = 0;
+  unsigned long stop = 0;
+  unsigned long duration = 0;
 };
 
 buttonState BUTTON_STATES[NUM_BUTTONS];
@@ -43,38 +45,40 @@ void setup() {
 long oldPosition  = -999;
 
 void loop() {
-  modeSw.update(); b1.update(); b2.update(); b3.update(); b4.update(); b5.update(); b6.update();
   long newPosition = myEnc.read();
   if (newPosition != oldPosition) {
     oldPosition = newPosition;
     // Serial.println(newPosition);
   }
   checkButtons();
-  Serial.print(modeSwState); Serial.print("\t");
-  if (modeSwState == 0){
-    Serial.print(b1State); Serial.print("\t");
-    Serial.print(b2State); Serial.print("\t");
-    Serial.print(b3State); Serial.print("\t");
-    Serial.print(b4State); Serial.print("\t");
-    Serial.print(b5State); Serial.print("\t");
-    Serial.print(b6State); Serial.print("\n");
-  }
-  else{
-    Serial.println(newPosition);
-  }
+  // for (int i = 0; i < NUM_BUTTONS; i++){
+  //   Serial.print(BUTTON_STATES[i].state); Serial.print("\t");
+  //   Serial.print(abs(BUTTON_STATES[i].stop - BUTTON_STATES[i].start)); Serial.print("\t");
+  // }
+  Serial.print(BUTTON_STATES[0].state); Serial.print("\t");
+  Serial.print(BUTTON_STATES[0].start); Serial.print("\t");
+  Serial.print(BUTTON_STATES[0].stop); Serial.print("\t");
+  Serial.print(BUTTON_STATES[0].duration);
+  Serial.println();
   
 }
 
 void checkButtons(){
+  modeSw.update();
   if (modeSw.changed()) {
     modeSwState = modeSw.read();
   }
   for (int i = 0; i < NUM_BUTTONS; i++)  {
     // Update the Bounce instance :
     buttons[i].update();
-    if (buttons[i].changed()){
-      BUTTON_STATES[i].state = buttons[i].read();
-      BUTTON_STATES[i].timestamp = millis();
+    if (buttons[i].fell()){
+      BUTTON_STATES[i].state = 1;
+      BUTTON_STATES[i].start = millis();
+    } 
+    else if(buttons[i].rose()){
+      BUTTON_STATES[i].state = 0;
+      BUTTON_STATES[i].stop = millis();
+      BUTTON_STATES[i].duration = BUTTON_STATES[i].stop - BUTTON_STATES[i].start;
     }
   }
 }
