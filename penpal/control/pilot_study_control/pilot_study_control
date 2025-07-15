@@ -5,12 +5,6 @@
 
 Encoder myEnc(6, 7);
 Bounce modeSw = Bounce();
-Bounce b1 = Bounce();
-Bounce b2 = Bounce();
-Bounce b3 = Bounce();
-Bounce b4 = Bounce();
-Bounce b5 = Bounce();
-Bounce b6 = Bounce();
 
 int modeSwState = LOW;
 
