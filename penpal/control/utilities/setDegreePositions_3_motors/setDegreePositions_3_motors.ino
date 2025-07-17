@@ -32,7 +32,7 @@ void setup() {
   DEBUG_SERIAL.begin(115200);
 
   // Set Port baudrate to 57600bps. This has to match with DYNAMIXEL baudrate.
-  dxl.begin(1000000);
+  dxl.begin(57600);
   // Set Port Protocol Version. This has to match with DYNAMIXEL protocol version.
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
   // Get DYNAMIXEL information
@@ -47,9 +47,9 @@ void setup() {
   dxl.setOperatingMode(DXL1, OP_POSITION);
   dxl.setOperatingMode(DXL2, OP_POSITION);
   dxl.setOperatingMode(DXL3, OP_POSITION);
-  // dxl.torqueOn(DXL1);
-  // dxl.torqueOn(DXL2);
-  // dxl.torqueOn(DXL3);
+  dxl.torqueOn(DXL1);
+  dxl.torqueOn(DXL2);
+  dxl.torqueOn(DXL3);
 }
 
 void loop() {

@@ -8,7 +8,6 @@ Serial myPort;
 ArrayList<PVector> points = new ArrayList<PVector>();  // Store drawing
 Table lookup;
 PVector lastSent = new PVector(-9999, -9999);
-float minMoveDist = 2;  // Minimum movement before updating
 String lastCommand = "";
 
 
@@ -43,16 +42,9 @@ void draw() {
 void mouseDragged() {
   PVector current = new PVector(mouseX, mouseY);
   points.add(current);
-
-  float distMoved = PVector.dist(current, lastSent);
-  println("Mouse moved: " + distMoved);
-
-  if (distMoved >= minMoveDist) {
-    sendMotorCommand(mouseX, mouseY);
-    lastSent.set(current);
-  } else {
-    println("Movement too small, not sending.");
-  }
+  
+  sendMotorCommand(mouseX, mouseY);
+  lastSent.set(current);
 }
 
 

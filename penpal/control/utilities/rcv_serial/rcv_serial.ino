@@ -34,6 +34,8 @@ void setup() {
   dxl.begin(1000000); // instead of 57600
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
+  Serial.println("You're connected to the network");
+
   dxl.ping(DXL0);
   dxl.ping(DXL1);
   dxl.ping(DXL2);
