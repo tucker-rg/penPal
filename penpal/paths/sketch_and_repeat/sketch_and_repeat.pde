@@ -30,8 +30,9 @@ int revReplayIndex;
 
 // int speed = 3;
 
-int mode = 1;
+int mode = 0;
 // 0: copy motion; 1: repeat forward/reverse; 2: repeat up/down
+// mode 2 really does not work lol
 
 Table lookup;
 Table lookupUpper;
