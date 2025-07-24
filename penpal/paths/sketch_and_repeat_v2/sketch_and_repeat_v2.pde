@@ -1,3 +1,10 @@
+import processing.serial.*;
+import java.util.*;
+import controlP5.*;
+
+ControlP5 cp5;
+Serial myPort;
+
 // Replacement for PVector
 class Vec2 {
   float x, y;
@@ -31,8 +38,9 @@ int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 
-int mode = 1;  // 0: send live, 1: replay (live doesn't work so well with the web server)
+int mode = 1;  // 0: send live, 1: replay 
 String lastCommand = "";
+Table lookup;
 
 final float DRAWING_MIN_X = -12.5;
 final float DRAWING_MAX_X = 12.5;
@@ -54,8 +62,16 @@ int BUTTON_Y;  // Now a variable since we might adjust it
 
 void setup() {
   size(400, 440);  // Added 40px at the top for controls
-  loadLookup();
-  lookupSize = lookup.length;
+  
+  // Serial setup
+  printArray(Serial.list());
+  String portName = Serial.list()[3];  // Adjust index as needed
+  myPort = new Serial(this, portName, 57600);
+  
+  cp5 = new ControlP5(this);
+  
+  // Load lookup table (and upper lookup table)
+  lookup = loadTable("lookup_table.csv", "header");
   
   // Center buttons in their respective halves
   slowButtonX = width/4 - BUTTON_WIDTH/2;    // Left half center
@@ -91,7 +107,6 @@ void draw() {
   
   popMatrix();
   
-  // In your draw() function, update the out-of-bounds warning:
   if (mousePressed && mouseY >= 40) {  // Only show in drawing area
     float realX = map(mouseX, 0, width, DRAWING_MIN_X, DRAWING_MAX_X);
     float realY = map(mouseY - 40, 0, height - 40, DRAWING_MIN_Y, DRAWING_MAX_Y);
@@ -257,17 +272,20 @@ void manageMode1() {
 
 // === CSV LOADING ===
 
-String[] findRow(float x, float y) {
-  float rx = round(x * 2) / 2.0;
-  float ry = round(y * 2) / 2.0 * -1;
+// Find closest matching X, Y in table
+TableRow getExactRow(float x, float y) {
+  float rx = (round(x * 2) / 2.0);  // round to nearest 0.5 
+  float ry = (round(y * 2) / 2.0) * -1; // flip this one
 
-  for (int i = 0; i < lookupSize; i++) {
-    if (lookup[i][0] == rx && lookup[i][1] == ry) {
-      return str(lookup[i]);
+  //println("Rounded to: X = " + rx + ", Y = " + ry);
+
+  for (TableRow row : lookup.rows()) {
+    if (row.getFloat("X") == rx && row.getFloat("Y") == ry) {
+      return row;
     }
   }
 
-  return null;
+  return null;  // no exact match found
 }
 
 // === MOTOR COMMAND ===
@@ -280,84 +298,24 @@ boolean inBounds(float x, float y) {
 }
 
 void sendMotorCommand(float x, float y) {
-  // Only proceed if we're not currently waiting for a response
-  if (!waitingForResponse) {
-    float realX = map(x, 0, width, -12.5, 12.5);
-    float realY = map(y, 0, height, -12.5, 12.5);
-    
-    String[] row = findRow(realX, realY);
-    if (row != null) {
-      String data = "0:" + row[2] + ",1:" + row[3] + ",2:" + row[4] + "\n";
-      if (!data.equals(lastCommand)) {
-        //sendViaHttp(data);
-        sendViaHttpAsync(data);  // Use async version
-        lastCommand = data;
-      }
-    }
-  }
-}
-
-void sendViaHttp(String data) {
-  try {
-    String[] parts = splitTokens(data, ":,\n ");
-    String url = "http://192.168.4.1/move?0=" + parts[1] + "&1=" + parts[3] + "&2=" + parts[5];
-    println("Sending: " + url);
-
-    String[] response = loadStrings(url);
-    if (response != null) {
-      println("Response: " + join(response, "\n"));
-    }
-  } catch (Exception e) {
-    println("HTTP Error: " + e.getMessage());
-  }
-}
-
-// Global variable to track pending requests
-boolean waitingForResponse = false;
-String lastRequestUrl = "";
-
-void sendViaHttpAsync(String data) {
-  // Only proceed if we're not currently waiting for a response
-  if (waitingForResponse) {
-    println("Skipping request - waiting for previous response");
-    return;
-  }
+  float realX = map(x, 0, width, -12.5, 12.5);
+  float realY = map(y, 0, height, -12.5, 12.5);
   
-  try {
-    String[] parts = splitTokens(data, ":,\n ");
-    String url = "http://192.168.4.1/move?0=" + parts[1] + "&1=" + parts[3] + "&2=" + parts[5];
-    lastRequestUrl = url; // Store for debugging
-    
-    waitingForResponse = true;
-    println("Sending async request: " + url);
-    
-    // Create a new thread for the HTTP request
-    new Thread(new Runnable() {
-      public void run() {
-        try {
-          // Actually make the HTTP request
-          String[] response = loadStrings(url);
-          
-          // Handle response (runs in the background thread)
-          if (response != null && response.length > 0) {
-            println("Async response: " + join(response, " "));
-          } else {
-            println("Empty async response");
-          }
-        } 
-        catch (Exception e) {
-          println("Async HTTP error: " + e.getMessage());
-        } 
-        finally {
-          // This runs when the request completes (success or failure)
-          waitingForResponse = false;
-        }
-      }
-    }).start();
-    
-  } catch (Exception e) {
-    println("Error preparing async request: " + e.getMessage());
-    waitingForResponse = false;
+  TableRow row = getExactRow(realX, realY);
+  if (row != null) {
+  int s0 = row.getInt("servo_0");
+  int s1 = row.getInt("servo_1");
+  int s2 = row.getInt("servo_2");
+
+  String data = "0:" + s0 + ",1:" + s1 + ",2:" + s2 + "\n";
+
+  if (!data.equals(lastCommand)) {
+    myPort.write(data);
+    print("Sent: " + data);
+    lastCommand = data;
+  } else {
+    println("Skipping duplicate command: " + data.trim());
+    }
   }
 }
 
