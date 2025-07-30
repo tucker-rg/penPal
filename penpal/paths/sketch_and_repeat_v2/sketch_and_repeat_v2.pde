@@ -5,29 +5,28 @@ import controlP5.*;
 ControlP5 cp5;
 Serial myPort;
 
-// Replacement for PVector
-class Vec2 {
-  float x, y;
-  Vec2(float x, float y) {
-    this.x = x;
-    this.y = y;
-  }
-}
-
-// Timed drawing point
+// Timed drawing point using PVector
 class TimedPoint {
-  Vec2 pos;
+  PVector pos;
   float time;
-  TimedPoint(Vec2 p, float t) {
+  TimedPoint(PVector p, float t) {
     pos = p;
     time = t;
   }
 }
-
 // Custom array list for TimedPoints
 TimedPoint[] stroke = new TimedPoint[1000];
 int strokeCount = 0;
 
+// Also three custom presets
+TimedPoint[] preset1 = new TimedPoint[1000];
+TimedPoint[] preset2 = new TimedPoint[1000];
+TimedPoint[] preset3 = new TimedPoint[1000];
+int preset1Length = 0;
+int preset2Length = 0;
+int preset3Length = 0;
+
+// State variables
 int strokeStartTime;
 boolean drawing = true;
 boolean replaying = false;
@@ -37,230 +36,270 @@ int replayIndex;
 int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
-
-int mode = 1;  // 0: send live, 1: replay 
 String lastCommand = "";
 Table lookup;
 
-final float DRAWING_MIN_X = -12.5;
-final float DRAWING_MAX_X = 12.5;
-final float DRAWING_MIN_Y = -12.5;
-final float DRAWING_MAX_Y = 12.5;
+// Controls
+int mode = 1;  // 0: send live, 1: replay, 2: loop
+float modalCutoff = 2.0; // out of the -12.5 to 12.5 square range
+float replaySpeed = 1.0;
+float size = 1.0;
+int angle = 0;
+int utilitySetting = 0;  // 0: self draw, 1: line, 2: triangle, 3: circle, 4: stamp (cat)\
+boolean connectLastPoint = false;
+int waitTime;
+int lineWait = 75;
+int triangleWait = 50;
+int circleWait = 10;
+int stampWait = 30;
 
-//for the buttons: 
-float replaySpeed = 1.0;  // Default normal speed (1.0 = 100%)
-final float SPEED_INCREMENT = 0.25;  // How much to change speed with each button press
-final float MIN_SPEED = 0.25;  // Minimum speed (25%)
-final float MAX_SPEED = 5.0;   // Maximum speed (200%)
+// UI
+int outerOffsetX = 100;
+int outerOffsetY = 70;
+int innerOffset = 40;
+int squareSize;
+int controlHeight = 40;
+int betweenControls = 20;
+float replay_speed = 1.0;
+int controlX, controlW, controlH, spacer;
+int buttonW, buttonH;
 
-// Button dimensions and positions (updated)
-final int BUTTON_WIDTH = 80;  // Wider buttons
-final int BUTTON_HEIGHT = 30;
-final int BUTTON_SPACING = 20;  // Space between buttons
-int slowButtonX, fastButtonX, speedDisplayX;
-int BUTTON_Y;  // Now a variable since we might adjust it
+// Drawing bounds (of the grid)
+final float DRAWING_MIN = -12.5;
+final float DRAWING_MAX = 12.5;
 
 void setup() {
-  size(400, 440);  // Added 40px at the top for controls
-  
+  size(1000, 600);  // default android window
+  surface.setResizable(true);
+
   // Serial setup
   printArray(Serial.list());
   String portName = Serial.list()[3];  // Adjust index as needed
   myPort = new Serial(this, portName, 57600);
   
-  cp5 = new ControlP5(this);
-  
-  // Load lookup table (and upper lookup table)
+  // Load lookup table
   lookup = loadTable("lookup_table.csv", "header");
   
-  // Center buttons in their respective halves
-  slowButtonX = width/4 - BUTTON_WIDTH/2;    // Left half center
-  fastButtonX = 3*width/4 - BUTTON_WIDTH/2;  // Right half center
-  speedDisplayX = width/2;                   // Center
-  BUTTON_Y = 5;  // Top padding
+  // Fill out the utility functions
+  setupUtil();
+  
+  // Draw controls
+  setupUI();
   
   println("Setup complete.");
 }
 
-void draw() {
-  background(255);
+void setupUI() {
+  cp5 = new ControlP5(this);
   
-  // Draw the speed control panel
-  drawSpeedControls();
-  
-  // Draw the drawing area (shifted down by 40px)
-  pushMatrix();
-  translate(0, 40);  // Shift everything below the control panel
-  
-  stroke(0);
-  noFill();
-  beginShape();
-  for (int i = 0; i < strokeCount; i++) {
-    Vec2 p = stroke[i].pos;
-    vertex(p.x, p.y);
-  }
-  endShape();
+  PFont font = createFont("Arial", 10);
+  cp5.setFont(font);
 
-  if (mode == 1) {
-    manageMode1();
+  squareSize = height - 2 * outerOffsetY;
+  controlX = outerOffsetX + squareSize + innerOffset;
+  controlW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 3;
+  controlH = controlHeight;
+  spacer = controlH + betweenControls; 
+  
+  buttonW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 5;
+  buttonH = buttonW / 2;
+  int buttonY = outerOffsetY + spacer * 3 + betweenControls * 2;
+
+  // Replay speed slider
+  cp5.addSlider("replaySpeed")
+     .setPosition(controlX, outerOffsetY + betweenControls)
+     .setRange(0.1, 2.0)
+     .setValue(replay_speed)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
+
+  // Size slider
+  cp5.addSlider("size") 
+     .setPosition(controlX, outerOffsetY + spacer + betweenControls)
+     .setRange(0.1, 2.0)
+     .setValue(size)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
+     
+  // Rotation slider
+  cp5.addSlider("angle")
+     .setPosition(controlX, outerOffsetY + spacer + spacer + betweenControls)
+     .setRange(-180, 180)
+     .setValue(angle)
+     .setSize(controlW, controlH);
+     //.setLabel("orientation");  // Hide default label
+     
+
+  // Line button
+  cp5.addButton("SetLine")
+     .setLabel("Line")
+     .setPosition(controlX, buttonY)
+     .setSize(buttonW, buttonH);
+
+  // Triangle button
+  cp5.addButton("SetTriangle")
+     .setLabel("Triangle")
+     .setPosition(controlX + buttonW + betweenControls, buttonY)
+     .setSize(buttonW, buttonH);
+
+  // Circle button
+  cp5.addButton("SetCircle")
+     .setLabel("Circle")
+     .setPosition(controlX, buttonY + buttonH + betweenControls)
+     .setSize(buttonW, buttonH);
+
+  // Stamp button
+  cp5.addButton("SetStamp")
+     .setLabel("Stamp")
+     .setPosition(controlX + buttonW + betweenControls, buttonY + buttonH + betweenControls)
+     .setSize(buttonW, buttonH);
+     
+  // clear button
+  cp5.addButton("clear")
+     .setLabel("clear")
+     .setPosition(controlX, buttonY + buttonH + betweenControls + buttonH + innerOffset)
+     .setSize(controlW / 2, controlH);
+     
+}
+
+void draw() {
+  background(200);
+  
+  // drawing square
+  stroke(0);
+  fill(255);
+  strokeWeight(0);
+  rect(outerOffsetX, outerOffsetY, squareSize, squareSize);
+  
+  // constrain drawing to inside the square
+  pushMatrix();
+  translate(outerOffsetX, outerOffsetY);
+  
+  // Draw stroke
+  stroke(0);
+  strokeWeight(5);
+  noFill();
+  
+  if (strokeCount > 0) {
+    beginShape();
+    for (int i = 0; i < strokeCount; i++) {
+      PVector newVertex = toSquareFromGrid(applyTransformations(stroke[i].pos));
+      if (inBounds(toScreen(newVertex))) {
+        vertex(newVertex.x, newVertex.y);
+      }
+    }
+    if (connectLastPoint) {
+      PVector firstVertex = toSquareFromGrid(applyTransformations(stroke[0].pos));
+      vertex(firstVertex.x, firstVertex.y);
+    }
+    endShape();
+    
+    // Keep track of where the tip is
+    if (!drawing) {
+      PVector currentVertex;
+      if (revReplaying) {
+        currentVertex = toSquareFromGrid(applyTransformations(stroke[revReplayIndex].pos));
+      } else {
+        currentVertex = toSquareFromGrid(applyTransformations(stroke[replayIndex].pos));
+      }
+      strokeWeight(0);
+      fill(255, 0, 0);
+      circle(currentVertex.x, currentVertex.y, 20);
+    }
   }
   
   popMatrix();
   
-  if (mousePressed && mouseY >= 40) {  // Only show in drawing area
-    float realX = map(mouseX, 0, width, DRAWING_MIN_X, DRAWING_MAX_X);
-    float realY = map(mouseY - 40, 0, height - 40, DRAWING_MIN_Y, DRAWING_MAX_Y);
-    
-    if (realX < DRAWING_MIN_X || realX > DRAWING_MAX_X || 
-        realY < DRAWING_MIN_Y || realY > DRAWING_MAX_Y) {
-      fill(255, 0, 0, 100);
-      noStroke();
-      ellipse(mouseX, mouseY, 30, 30);
-      fill(0);
-      textAlign(CENTER, CENTER);
-      text("OUT OF BOUNDS", mouseX, mouseY);
-    }
-  }
+  // Handle modes
+  // We don't need anything for mode0
+  if (mode == 1) manageMode1();
+  if (mode == 2) manageMode2();
+  if (mode == 3) manageMode3(waitTime); // BRUTE FORCE
 }
 
-void drawSpeedControls() {
-  // Control panel background
-  fill(240);
-  noStroke();
-  rect(0, 0, width, 40);
-  
-  // Draw slow button (left half)
-  fill(200);
-  rect(slowButtonX, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, 5);
-  fill(0);
-  textAlign(CENTER, CENTER);
-  text("SLOWER", slowButtonX + BUTTON_WIDTH/2, BUTTON_Y + BUTTON_HEIGHT/2);
-  
-  // Draw speed display (center)
-  fill(255);
-  rect(speedDisplayX - BUTTON_WIDTH/2, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, 5);
-  fill(0);
-  text(nf(replaySpeed, 1, 2) + "x", speedDisplayX, BUTTON_Y + BUTTON_HEIGHT/2);
-  
-  // Draw fast button (right half)
-  fill(200);
-  rect(fastButtonX, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, 5);
-  fill(0);
-  text("FASTER", fastButtonX + BUTTON_WIDTH/2, BUTTON_Y + BUTTON_HEIGHT/2);
-  
-  // Add dividing lines for visual separation
-  stroke(150);
-  line(width/2 - 50, BUTTON_Y + 5, width/2 - 50, BUTTON_Y + BUTTON_HEIGHT - 5);
-  line(width/2 + 50, BUTTON_Y + 5, width/2 + 50, BUTTON_Y + BUTTON_HEIGHT - 5);
-  noStroke();
-}
-
+// Input handlers
 void mousePressed() {
-  // First check if clicking in control area (y < 40)
-  if (mouseY < 40) {
-    if (mouseX >= slowButtonX && mouseX <= slowButtonX + BUTTON_WIDTH) {
-      // Slow down button
-      replaySpeed = max(MIN_SPEED, replaySpeed - SPEED_INCREMENT);
-    } else if (mouseX >= fastButtonX && mouseX <= fastButtonX + BUTTON_WIDTH) {
-      // Speed up button
-      replaySpeed = min(MAX_SPEED, replaySpeed + SPEED_INCREMENT);
-    }
-    return;  // Don't start new stroke if clicking controls
+  if (inBounds()) {
+    connectLastPoint = false;
+    utilitySetting = 0;
+    strokeCount = 0;
+    strokeStartTime = millis();
+    drawing = true;
+    replaying = false;
+    revReplaying = false;
   }
-  
-  // Original mousePressed code (using drawingMouseY if needed)
-  strokeCount = 0;
-  strokeStartTime = millis();
-  drawing = true;
-  replaying = false;
-  revReplaying = false;
 }
 
 void mouseDragged() {
-  // Only draw if in drawing area (y >= 40)
-  if (mouseY < 40) return;
-  
   if (drawing) {
-    Vec2 pos = new Vec2(mouseX, mouseY - 40);  // Adjust for control panel
+    PVector pos = new PVector(mouseX, mouseY);
     float t = millis() - strokeStartTime;
-    if (strokeCount < stroke.length) {
-      stroke[strokeCount++] = new TimedPoint(pos, t);
+    if (strokeCount < stroke.length && inBounds()) {
+      stroke[strokeCount++] = new TimedPoint(undoTransformations(toGrid(toSquare(pos))), t);
     }
-
-    if (mode == 0 && inBounds(pos.x, pos.y)) {
-      sendMotorCommand(pos.x, pos.y);
+    if (mode == 0 && inBounds()) {
+      sendMotorCommand(pos);
     }
   }
 }
 
 void mouseReleased() {
-  if (mode == 1) {
-    drawing = false;
-    replaying = true;
-    revReplaying = false;
-    replayStartTime = millis();
-    replayIndex = 0;
+  if (inBounds()) {
+    if (mode != 0 && strokeCount > 0) {
+      setMode1or2();
+      // Start replay
+      startReplay();
+    }
   }
 }
 
+// Mode management
 void manageMode1() {
   if (replaying) {
     float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
     
-    // Find the most recent point that should have been displayed by now
     int targetIndex = -1;
     for (int i = replayIndex; i < strokeCount; i++) {
       if (stroke[i].time <= currentTargetTime) {
         targetIndex = i;
-      } else {
-        break;
-      }
+      } else break;
     }
     
-    // If we found a point to display
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      if (inBounds(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y)) {
-        sendMotorCommand(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y);
-      }
+      sendMotorCommand(stroke[targetIndex].pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
     
-    // Check if we've reached the end
     if (replayIndex >= strokeCount) {
+      delay(100);
       replaying = false;
       revReplaying = true;
-      replayStartTime = millis();
+      revReplayStartTime = millis();
       lastSentIndex = -1;
       revReplayIndex = strokeCount - 1;
     }
   }
   
   if (revReplaying) {
-    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+    float currentTargetTime = (millis() - revReplayStartTime) * replaySpeed;
     float maxTime = stroke[strokeCount-1].time;
     
-    // Find the most recent point that should have been displayed in reverse
     int targetIndex = -1;
     for (int i = revReplayIndex; i >= 0; i--) {
       if ((maxTime - stroke[i].time) <= currentTargetTime) {
         targetIndex = i;
-      } else {
-        break;
-      }
+      } else break;
     }
     
-    // If we found a point to display
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      if (inBounds(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y)) {
-        sendMotorCommand(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y);
-      }
+      sendMotorCommand(stroke[targetIndex].pos);
       lastSentIndex = targetIndex;
       revReplayIndex = targetIndex - 1;
     }
     
-    // Check if we've reached the beginning
     if (revReplayIndex < 0) {
+      delay(100);
       revReplaying = false;
       replaying = true;
       replayStartTime = millis();
@@ -270,61 +309,162 @@ void manageMode1() {
   }
 }
 
-// === CSV LOADING ===
+void manageMode2() {
+  if (replaying) {
+    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+    
+    int targetIndex = -1;
+    for (int i = replayIndex; i < strokeCount; i++) {
+      if (stroke[i].time <= currentTargetTime) {
+        targetIndex = i;
+      } else break;
+    }
+    
+    if (targetIndex != -1 && targetIndex != lastSentIndex) {
+      sendMotorCommand(stroke[targetIndex].pos);
+      lastSentIndex = targetIndex;
+      replayIndex = targetIndex + 1;
+    }
+    
+    if (replayIndex >= strokeCount) {
+      replayStartTime = millis();
+      lastSentIndex = -1;
+      replayIndex = 0;
+    }
+  }
+}
 
-// Find closest matching X, Y in table
-TableRow getExactRow(float x, float y) {
-  float rx = (round(x * 2) / 2.0);  // round to nearest 0.5 
-  float ry = (round(y * 2) / 2.0) * -1; // flip this one
+void manageMode3(int defaultWait) { // BRUTE FORCE
+  if (replaying) {
+    sendMotorCommand(stroke[replayIndex].pos);
+    replayIndex++;
+    int delayTime = int(defaultWait / replaySpeed);
+    delay(delayTime);  // ensure delay is never 0
+    if (replayIndex >= strokeCount) {
+      replayIndex = 0;
+    }
+  }
+}
 
-  //println("Rounded to: X = " + rx + ", Y = " + ry);
+
+
+// Helper methods
+
+PVector applyTransformations(PVector original) {
+  PVector transformed = original.copy();
+  
+  // Apply scaling
+  println("size: ", size);
+  transformed.mult(size);
+  
+  // Apply rotation
+  println("orientation: ", angle);
+  transformed.rotate(radians(-angle));
+  
+  return transformed;
+}
+
+PVector undoTransformations(PVector transformed) {
+  PVector original = transformed.copy();
+  
+  // Apply scaling
+  original.mult(1 / size);
+  
+  // Apply rotation
+  original.rotate(radians(angle));
+  
+  return original;
+}
+
+// returns if the mouse is currently within the square
+boolean inBounds() {
+  float localX = mouseX - outerOffsetX;
+  float localY = mouseY - outerOffsetY;
+
+  // Are we in the square
+  if (localX >= 0 && localX <= squareSize &&
+      localY >= 0 && localY <= squareSize) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// Modified inBounds to accept PVector
+boolean inBounds(PVector pos) {
+  float localX = pos.x - outerOffsetX;
+  float localY = pos.y - outerOffsetY;
+
+  return (localX >= 0 && localX <= squareSize &&
+          localY >= 0 && localY <= squareSize);
+}
+
+// converts screen coordinates to square coordinates
+PVector toSquare(PVector pos) {
+  float localX = pos.x - outerOffsetX;
+  float localY = pos.y - outerOffsetY;
+
+  PVector returns = new PVector(localX, localY);
+  return returns;
+}
+
+// converts square coordinates to screen coordinates
+PVector toScreen(PVector pos) {
+  float localX = pos.x + outerOffsetX;
+  float localY = pos.y + outerOffsetY;
+
+  PVector returns = new PVector(localX, localY);
+  return returns;
+}
+
+// converts square coordinates to grid coordinates
+PVector toGrid(PVector pos) {
+  float gridX = map(pos.x, 0, squareSize, DRAWING_MIN, DRAWING_MAX);
+  float gridY = map(pos.y, 0, squareSize, DRAWING_MAX, DRAWING_MIN); // We reverse
+  PVector gridCoord = new PVector(gridX, gridY);
+  
+  return gridCoord;
+}
+
+// converts grid coordinates to square coordinates
+PVector toSquareFromGrid(PVector pos) {
+  float localX = map(pos.x, DRAWING_MIN, DRAWING_MAX, 0, squareSize);
+  float localY = map(pos.y, DRAWING_MAX, DRAWING_MIN, 0, squareSize);
+  
+  PVector squareCoord = new PVector(localX, localY);
+  return squareCoord;
+}
+
+TableRow getExactRow(PVector pos) {
+  float rx = (round(pos.x * 2) / 2.0);
+  float ry = (round(pos.y * 2) / 2.0) * -1;
 
   for (TableRow row : lookup.rows()) {
     if (row.getFloat("X") == rx && row.getFloat("Y") == ry) {
       return row;
     }
   }
-
-  return null;  // no exact match found
+  return null;
 }
 
 // === MOTOR COMMAND ===
 
-boolean inBounds(float x, float y) {
-  if (0 <= x && x <= 400 && 0 <= y && y <= 400) {
-    return true;
-  }
-  return false;
-}
-
-void sendMotorCommand(float x, float y) {
-  float realX = map(x, 0, width, -12.5, 12.5);
-  float realY = map(y, 0, height, -12.5, 12.5);
+// sends grid coordinates to the pen
+void sendMotorCommand(PVector cmd) {
+  PVector transformedCmd = applyTransformations(cmd);
+  PVector flippedCmd = new PVector(transformedCmd.x, -transformedCmd.y); // to account for how the pen is usually held "upside down"
   
-  TableRow row = getExactRow(realX, realY);
+  TableRow row = getExactRow(flippedCmd);
+  
   if (row != null) {
-  int s0 = row.getInt("servo_0");
-  int s1 = row.getInt("servo_1");
-  int s2 = row.getInt("servo_2");
-
-  String data = "0:" + s0 + ",1:" + s1 + ",2:" + s2 + "\n";
-
-  if (!data.equals(lastCommand)) {
-    myPort.write(data);
-    print("Sent: " + data);
-    lastCommand = data;
-  } else {
-    println("Skipping duplicate command: " + data.trim());
+    String data = String.format("0:%d,1:%d,2:%d\n", 
+      row.getInt("servo_0"), 
+      row.getInt("servo_1"), 
+      row.getInt("servo_2"));
+    
+    if (!data.equals(lastCommand)) {
+      myPort.write(data);
+      lastCommand = data;
     }
-  }
-}
-
-void keyPressed() {
-  if (key == 'c' || key == 'C') {
-    strokeCount = 0;
-    drawing = true;
-    replaying = false;
-    revReplaying = false;
-    println("Cleared.");
   }
 }

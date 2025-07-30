@@ -1,32 +1,31 @@
-import android.os.Bundle;
-import android.view.MotionEvent;
-import android.net.*;
+import android.net.wifi.WifiManager;
+import android.content.Context;
 import java.io.*;
+import java.net.*;
+import java.util.*;
+import controlP5.*;
 
-// Replacement for PVector
-class Vec2 {
-  float x, y;
-  Vec2(float x, float y) {
-    this.x = x;
-    this.y = y;
-  }
-}
+DatagramSocket udpSocket;
+InetAddress arduinoIP;
+ControlP5 cp5;
 
-// Timed drawing point
+// Timed drawing point using PVector
 class TimedPoint {
-  Vec2 pos;
+  PVector pos;
   float time;
-  TimedPoint(Vec2 p, float t) {
+  TimedPoint(PVector p, float t) {
     pos = p;
     time = t;
   }
 }
 
-// Drawing and control variables
+// Custom array for TimedPoints
 TimedPoint[] stroke = new TimedPoint[1000];
 int strokeCount = 0;
+
+// State variables
 int strokeStartTime;
-boolean drawing = false;
+boolean drawing = true;
 boolean replaying = false;
 boolean revReplaying = false;
 int replayStartTime;
@@ -34,119 +33,113 @@ int replayIndex;
 int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;
-int mode = 1; // 0: send live, 1: replay
 
-// Drawing area bounds
-final float DRAWING_MIN_X = -12.5;
-final float DRAWING_MAX_X = 12.5;
-final float DRAWING_MIN_Y = -12.5;
-final float DRAWING_MAX_Y = 12.5;
-
-// Speed control
+// Controls
+int mode = 1;  // 0: send live, 1: replay, 2: loop
+float modalCutoff = 2.0; // out of the -12.5 to 12.5 square range
 float replaySpeed = 1.0;
-final float SPEED_INCREMENT = 0.25;
-final float MIN_SPEED = 0.25;
-final float MAX_SPEED = 5.0;
-
-// Button layout
-final int BUTTON_WIDTH = 120;
-final int BUTTON_HEIGHT = 50;
-final int CONTROL_PANEL_HEIGHT = 60;
-int slowButtonX, fastButtonX, speedDisplayX;
-
-// Networking
 String lastCommand = "";
-boolean waitingForResponse = false;
-String lastRequestUrl = "";
+Table lookup;
+float size = 1.0;
 
-// Android touch tracking
-boolean[] touchDown = new boolean[10];
+// UI
+int outerOffsetX = 100;
+int outerOffsetY = 70;
+int innerOffset = 50;
+int squareSize;
+int controlHeight = 60;
+float replay_speed = 1.0;
+int controlX, controlW, controlH, spacer;
 
-// ================= ANDROID LIFECYCLE =================
-void onCreate(Bundle savedInstanceState) {
-  super.onCreate(savedInstanceState);
-  orientation(PORTRAIT); // Lock to portrait mode
-}
-
-void settings() {
-  fullScreen();
-  pixelDensity(displayDensity()); // Handle high-res displays
-}
+// Drawing bounds (of the grid)
+final float DRAWING_MIN = -12.5;
+final float DRAWING_MAX = 12.5;
 
 void setup() {
-  // Initialize button positions
-  slowButtonX = width/4 - BUTTON_WIDTH/2;
-  fastButtonX = 3*width/4 - BUTTON_WIDTH/2;
-  speedDisplayX = width/2;
+  //size(400, 400); 
+  fullScreen();
+  orientation(LANDSCAPE);
+  setupUI();
   
-  // Load your motor lookup table
-  loadLookup();
+  // Load lookup table
+  lookup = loadTable("lookup_table.csv", "header");
   
-  println("Setup complete");
+  // UDP setup
+  try {
+    udpSocket = new DatagramSocket();
+    arduinoIP = InetAddress.getByName("192.168.4.1");
+  } catch (Exception e) {
+    e.printStackTrace();
+  }
+  
+  
 }
 
-// ================= MAIN DRAW LOOP =================
+void setupUI() {
+  cp5 = new ControlP5(this);
+  
+  background(200);
+  
+  PFont font = createFont("Arial", 10);
+  cp5.setFont(font);
+  
+  squareSize = height - 2 * outerOffsetY;
+  controlX = outerOffsetX + squareSize + innerOffset;
+  controlW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 3;
+  controlH = controlHeight;
+  spacer = controlH + innerOffset; 
+
+  // Replay speed slider
+  cp5.addSlider("replaySpeed")
+     .setPosition(controlX, outerOffsetY + innerOffset)
+     .setRange(0.1, 3.0)
+     .setValue(replay_speed)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
+
+  // Size slider
+  cp5.addSlider("size")
+     .setPosition(controlX, outerOffsetY + innerOffset + spacer)
+     .setRange(0.1, 3.0)
+     .setValue(size)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
+}
+
 void draw() {
-  background(255);
+  // drawing square
+  stroke(0);
+  fill(255);
+  strokeWeight(0);
+  rect(outerOffsetX, outerOffsetY, squareSize, squareSize);
   
-  // Draw control panel
-  drawSpeedControls();
+  // constrain drawing to inside the square
+  pushMatrix();
+  translate(outerOffsetX, outerOffsetY);
+  clip(0, 0, squareSize, squareSize);
   
-  // Draw the current stroke
-  drawCurrentStroke();
+  // Draw stroke
+  stroke(0);
+  strokeWeight(5);
+  noFill();
   
-  // Handle replay if active
-  if (mode == 1) {
-    manageReplay();
-  }
-  
-  // Debug touch points
-  drawTouchDebug();
-}
-
-// ================= TOUCH HANDLING =================
-public boolean surfaceTouchEvent(MotionEvent event) {
-  int action = event.getActionMasked();
-  int idx = event.getActionIndex();
-  int id = event.getPointerId(idx);
-  
-  switch(action) {
-    case MotionEvent.ACTION_DOWN:
-    case MotionEvent.ACTION_POINTER_DOWN:
-      touchDown[id] = true;
-      touchStarted(event.getX(idx), event.getY(idx));
-      break;
-      
-    case MotionEvent.ACTION_MOVE:
-      for (int i = 0; i < event.getPointerCount(); i++) {
-        if (touchDown[event.getPointerId(i)]) {
-          touchMoved(event.getX(i), event.getY(i));
-        }
-      }
-      break;
-      
-    case MotionEvent.ACTION_UP:
-    case MotionEvent.ACTION_POINTER_UP:
-      touchDown[id] = false;
-      touchEnded(event.getX(idx), event.getY(idx));
-      break;
-  }
-  return super.surfaceTouchEvent(event);
-}
-
-void touchStarted(float x, float y) {
-  if (y < CONTROL_PANEL_HEIGHT) {
-    // Handle control panel touches
-    if (x >= slowButtonX && x <= slowButtonX + BUTTON_WIDTH) {
-      replaySpeed = max(MIN_SPEED, replaySpeed - SPEED_INCREMENT);
-    } 
-    else if (x >= fastButtonX && x <= fastButtonX + BUTTON_WIDTH) {
-      replaySpeed = min(MAX_SPEED, replaySpeed + SPEED_INCREMENT);
+  if (strokeCount > 0) {
+    beginShape();
+    for (int i = 0; i < strokeCount; i++) {
+      vertex(stroke[i].pos.x, stroke[i].pos.y);
     }
-    return;
+    endShape();
   }
   
-  // Start new stroke
+  popMatrix();
+
+  // Handle current mode
+  if (mode == 1) manageMode1();
+  if (mode == 2) manageMode2();
+}
+
+// Input handlers
+void mousePressed() {
   strokeCount = 0;
   strokeStartTime = millis();
   drawing = true;
@@ -154,235 +147,196 @@ void touchStarted(float x, float y) {
   revReplaying = false;
 }
 
-void touchMoved(float x, float y) {
-  if (!drawing || y < CONTROL_PANEL_HEIGHT) return;
-  
-  Vec2 pos = new Vec2(x, y - CONTROL_PANEL_HEIGHT);
-  float t = millis() - strokeStartTime;
-  
-  if (strokeCount < stroke.length) {
-    stroke[strokeCount++] = new TimedPoint(pos, t);
-  }
-
-  if (mode == 0) {
-    sendMotorCommand(pos.x, pos.y);
+void mouseDragged() {
+  if (drawing) {
+    PVector pos = new PVector(mouseX, mouseY);
+    float t = millis() - strokeStartTime;
+    if (strokeCount < stroke.length && inBounds()) {
+      stroke[strokeCount++] = new TimedPoint(toSquare(pos), t);
+    }
+    if (mode == 0 && inBounds()) {
+      sendMotorCommand(pos);
+    }
   }
 }
 
-void touchEnded(float x, float y) {
-  if (mode == 1) {
+void mouseReleased() {
+  if (mode != 0 && strokeCount > 0) {
+    // Convert screen coordinates to real coordinates first
+    PVector startPos = toGrid(stroke[0].pos);
+    PVector endPos = toGrid(stroke[strokeCount - 1].pos);
+    
+    if (PVector.dist(startPos, endPos) > modalCutoff) {
+      mode = 1;
+    } else {
+      mode = 2;
+    }
+    
+    // Start replay
     drawing = false;
     replaying = true;
+    revReplaying = false;
     replayStartTime = millis();
     replayIndex = 0;
+    lastSentIndex = -1;
   }
 }
 
-// ================= DRAWING FUNCTIONS =================
-void drawSpeedControls() {
-  // Control panel background
-  fill(240);
-  noStroke();
-  rect(0, 0, width, CONTROL_PANEL_HEIGHT);
-  
-  // Slow button
-  fill(200);
-  rect(slowButtonX, 10, BUTTON_WIDTH, BUTTON_HEIGHT, 10);
-  fill(0);
-  textAlign(CENTER, CENTER);
-  textSize(18);
-  text("SLOWER", slowButtonX + BUTTON_WIDTH/2, 10 + BUTTON_HEIGHT/2);
-  
-  // Speed display
-  fill(255);
-  rect(speedDisplayX - BUTTON_WIDTH/2, 10, BUTTON_WIDTH, BUTTON_HEIGHT, 10);
-  fill(0);
-  text(nf(replaySpeed, 1, 2) + "x", speedDisplayX, 10 + BUTTON_HEIGHT/2);
-  
-  // Fast button
-  fill(200);
-  rect(fastButtonX, 10, BUTTON_WIDTH, BUTTON_HEIGHT, 10);
-  fill(0);
-  text("FASTER", fastButtonX + BUTTON_WIDTH/2, 10 + BUTTON_HEIGHT/2);
-}
-
-void drawCurrentStroke() {
-  pushMatrix();
-  translate(0, CONTROL_PANEL_HEIGHT);
-  
-  // Draw the stroke
-  if (strokeCount > 1) {
-    beginShape();
-    noFill();
-    stroke(0);
-    strokeWeight(4);
-    for (int i = 0; i < strokeCount; i++) {
-      vertex(stroke[i].pos.x, stroke[i].pos.y);
-    }
-    endShape();
-  }
-  
-  // Draw out-of-bounds warning
-  if (drawing && touchDown[0]) {
-    float realX = map(stroke[strokeCount-1].pos.x, 0, width, DRAWING_MIN_X, DRAWING_MAX_X);
-    float realY = map(stroke[strokeCount-1].pos.y, 0, height-CONTROL_PANEL_HEIGHT, DRAWING_MIN_Y, DRAWING_MAX_Y);
-    
-    if (realX < DRAWING_MIN_X || realX > DRAWING_MAX_X || 
-        realY < DRAWING_MIN_Y || realY > DRAWING_MAX_Y) {
-      fill(255, 0, 0, 100);
-      noStroke();
-      ellipse(stroke[strokeCount-1].pos.x, stroke[strokeCount-1].pos.y, 40, 40);
-      fill(0);
-      textAlign(CENTER, CENTER);
-      text("OUT OF BOUNDS", stroke[strokeCount-1].pos.x, stroke[strokeCount-1].pos.y);
-    }
-  }
-  
-  popMatrix();
-}
-
-void drawTouchDebug() {
-  // Visualize touch points (debug)
-  for (int i = 0; i < touchDown.length; i++) {
-    if (touchDown[i]) {
-      fill(255, 0, 0, 100);
-      noStroke();
-      ellipse(touches[i].x, touches[i].y, 50, 50);
-    }
-  }
-}
-
-// ================= REPLAY SYSTEM =================
-void manageReplay() {
+// Mode management (unchanged except for PVector)
+void manageMode1() {
   if (replaying) {
     float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
     
-    // Find current point to display
     int targetIndex = -1;
     for (int i = replayIndex; i < strokeCount; i++) {
       if (stroke[i].time <= currentTargetTime) {
         targetIndex = i;
-      } else {
-        break;
-      }
+      } else break;
     }
     
-    // Send motor command if new point found
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y);
+      sendMotorCommand(stroke[targetIndex].pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
     
-    // Check if reached end
     if (replayIndex >= strokeCount) {
-      startReversePlayback();
+      delay(100);
+      replaying = false;
+      revReplaying = true;
+      revReplayStartTime = millis();
+      lastSentIndex = -1;
+      revReplayIndex = strokeCount - 1;
     }
   }
   
   if (revReplaying) {
-    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+    float currentTargetTime = (millis() - revReplayStartTime) * replaySpeed;
     float maxTime = stroke[strokeCount-1].time;
     
-    // Find current point in reverse
     int targetIndex = -1;
     for (int i = revReplayIndex; i >= 0; i--) {
       if ((maxTime - stroke[i].time) <= currentTargetTime) {
         targetIndex = i;
-      } else {
-        break;
-      }
+      } else break;
     }
     
-    // Send motor command if new point found
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(stroke[targetIndex].pos.x, stroke[targetIndex].pos.y);
+      sendMotorCommand(stroke[targetIndex].pos);
       lastSentIndex = targetIndex;
       revReplayIndex = targetIndex - 1;
     }
     
-    // Check if reached start
     if (revReplayIndex < 0) {
-      startForwardPlayback();
+      delay(100);
+      revReplaying = false;
+      replaying = true;
+      replayStartTime = millis();
+      lastSentIndex = -1;
+      replayIndex = 0;
     }
   }
 }
 
-void startForwardPlayback() {
-  replaying = true;
-  revReplaying = false;
-  replayStartTime = millis();
-  replayIndex = 0;
-  lastSentIndex = -1;
-}
-
-void startReversePlayback() {
-  replaying = false;
-  revReplaying = true;
-  replayStartTime = millis();
-  revReplayIndex = strokeCount - 1;
-  lastSentIndex = -1;
-}
-
-// ================= MOTOR CONTROL =================
-void sendMotorCommand(float x, float y) {
-  if (waitingForResponse) return;
-  
-  float realX = map(x, 0, width, DRAWING_MIN_X, DRAWING_MAX_X);
-  float realY = map(y, 0, height-CONTROL_PANEL_HEIGHT, DRAWING_MIN_Y, DRAWING_MAX_Y);
-  
-  String[] row = findRow(realX, realY);
-  if (row != null) {
-    String data = "0:" + row[2] + ",1:" + row[3] + ",2:" + row[4];
-    sendAndroidHttp(data);
+void manageMode2() {
+  if (replaying) {
+    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+    
+    int targetIndex = -1;
+    for (int i = replayIndex; i < strokeCount; i++) {
+      if (stroke[i].time <= currentTargetTime) {
+        targetIndex = i;
+      } else break;
+    }
+    
+    if (targetIndex != -1 && targetIndex != lastSentIndex) {
+      sendMotorCommand(stroke[targetIndex].pos);
+      lastSentIndex = targetIndex;
+      replayIndex = targetIndex + 1;
+    }
+    
+    if (replayIndex >= strokeCount) {
+      replayStartTime = millis();
+      lastSentIndex = -1;
+      replayIndex = 0;
+    }
   }
 }
 
-void sendAndroidHttp(final String data) {
-  waitingForResponse = true;
-  new Thread(new Runnable() {
-    public void run() {
-      try {
-        URL url = new URL("http://192.168.4.1/move?" + data);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(1000);
-        
-        BufferedReader in = new BufferedReader(
-          new InputStreamReader(conn.getInputStream()));
-        String response = in.readLine();
-        in.close();
-        
-        println("Response: " + response);
-      } catch (Exception e) {
-        println("HTTP Error: " + e.getMessage());
-      } finally {
-        waitingForResponse = false;
-      }
-    }
-  }).start();
+// Helper methods (unchanged)
+
+// returns if the mouse is currently within the square
+boolean inBounds() {
+  float localX = mouseX - outerOffsetX;
+  float localY = mouseY - outerOffsetY;
+
+  // Are we in the square
+  if (localX >= 0 && localX <= squareSize &&
+      localY >= 0 && localY <= squareSize) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-// ================= HELPER FUNCTIONS =================
-String[] findRow(float x, float y) {
-  float rx = round(x * 2) / 2.0;
-  float ry = round(y * 2) / 2.0 * -1;
+// converts screen coordinates to square coordinates
+PVector toSquare(PVector pos) {
+  float localX = pos.x - outerOffsetX;
+  float localY = pos.y - outerOffsetY;
 
-  for (int i = 0; i < lookupSize; i++) {
-    if (lookup[i][0] == rx && lookup[i][1] == ry) {
-      return str(lookup[i]);
+  PVector returns = new PVector(localX, localY);
+  return returns;
+}
+
+// converts square coordinates to grid coordinates
+PVector toGrid(PVector pos) {
+  float gridX = map(pos.x, 0, squareSize, DRAWING_MIN, DRAWING_MAX);
+  float gridY = map(pos.y, 0, squareSize, DRAWING_MIN, DRAWING_MAX);
+  PVector gridCoord = new PVector(gridX, gridY);
+  
+  return gridCoord;
+}
+
+TableRow getExactRow(PVector pos) {
+  float rx = (round(pos.x * 2) / 2.0);
+  float ry = (round(pos.y * 2) / 2.0) * -1;
+
+  for (TableRow row : lookup.rows()) {
+    if (row.getFloat("X") == rx && row.getFloat("Y") == ry) {
+      return row;
     }
   }
   return null;
 }
 
-// ================= ANDROID MANIFEST =================
-// Add this to your sketch's manifest.xml file:
-/*
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="your.package.name">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-</manifest>
-*/
+void sendMotorCommand(PVector cmd) {
+  PVector gridCmd = toGrid(cmd);
+  TableRow row = getExactRow(gridCmd);
+  
+  if (row != null) {
+    String data = String.format("0=%d,1=%d,2=%d\n", 
+      row.getInt("servo_0"), 
+      row.getInt("servo_1"), 
+      row.getInt("servo_2"));
+    
+    if (!data.equals(lastCommand)) {
+      sendViaUDP(data);
+      lastCommand = data;
+    }
+  }
+}
+
+void sendViaUDP(String data) {
+  try {
+    byte[] sendData = data.getBytes();
+    DatagramPacket sendPacket = new DatagramPacket(
+      sendData, sendData.length, arduinoIP, 8888);
+    udpSocket.send(sendPacket);
+  } catch (Exception e) {
+    println("UDP Error: " + e.getMessage());
+  }
+}
+
+void keyPressed() {
+  if (key == 'c' || key == 'C') clear();
+}

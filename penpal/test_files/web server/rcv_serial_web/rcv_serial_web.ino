@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <WiFiNINA.h>
 #include "arduino_secrets.h" 
+#include <WiFiUdp.h>
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
@@ -24,9 +25,13 @@ float input_0 = 0.0;
 float input_1 = 0.0;
 float input_2 = 0.0;
 
+WiFiUDP Udp;
+unsigned int localPort = 8888;
+
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
+  // while (!Serial);
+  delay(2000);
 
   Serial.println("Access Point Web Server");
 
@@ -63,6 +68,8 @@ void setup() {
   // you're connected now, so print out the status
   printWiFiStatus();
 
+  // We use UDP for faster connection
+  Udp.begin(localPort);
 
   // Dynamixel setup
   dxl.begin(1000000);
@@ -103,9 +110,23 @@ void loop() {
     client.println("Command received.");
     client.stop();
   }
+
+  // Check for UDP packets
+  int packetSize = Udp.parsePacket();
+  if (packetSize) {
+    char packetBuffer[255];
+    int len = Udp.read(packetBuffer, 255);
+    if (len > 0) {
+      packetBuffer[len] = 0;
+      String message = String(packetBuffer);
+      handleMoveRequest(message);
+    }
+  }
 }
 
 void handleMoveRequest(String req) {
+  Serial.print("Raw message: ");
+  Serial.println(req);
   float val0 = getValueFromRequest(req, "0");
   float val1 = getValueFromRequest(req, "1");
   float val2 = getValueFromRequest(req, "2");
@@ -119,9 +140,13 @@ void handleMoveRequest(String req) {
   Serial.print(val1); Serial.print(", ");
   Serial.println(val2);
 
-  dxl.setGoalPosition(DXL0, input_0, UNIT_DEGREE);
-  dxl.setGoalPosition(DXL1, input_1, UNIT_DEGREE);
-  dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE);
+  if (5 <= input_0 && input_0 <= 310 && 5 <= input_1 && input_1 <= 310 && 5 <= input_2 && input_2 <= 310) {
+    dxl.setGoalPosition(DXL0, input_0, UNIT_DEGREE);
+    dxl.setGoalPosition(DXL1, input_1, UNIT_DEGREE);
+    dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE); 
+  } else {
+    Serial.println("out of bounds");
+  }
 }
 
 float getValueFromRequest(String req, String key) {
