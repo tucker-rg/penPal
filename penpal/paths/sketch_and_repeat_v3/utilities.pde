@@ -1,10 +1,29 @@
-// This is where we store the utility functions (line, circle, etc)
-// Also, other controls
+// This is where we store the utility motions (line, circle, etc)
+// Also, other preset motions, chosen by the user
 
 TimedPoint[] line = new TimedPoint[2];
 TimedPoint[] triangle = new TimedPoint[3];
 TimedPoint[] circle = new TimedPoint[15];
 TimedPoint[] stamp = new TimedPoint[156];
+
+// Also three custom presets
+TimedPoint[] preset1 = new TimedPoint[1000];
+TimedPoint[] preset2 = new TimedPoint[1000];
+TimedPoint[] preset3 = new TimedPoint[1000];
+TimedPoint[] preset4 = new TimedPoint[1000];
+int preset1Length = 0;
+int preset2Length = 0;
+int preset3Length = 0;
+int preset4Length = 0;
+boolean preset1Normalized;
+boolean preset2Normalized;
+boolean preset3Normalized;
+boolean preset4Normalized;
+
+int lineWait = 75;
+int triangleWait = 50;
+int circleWait = 10;
+int stampWait = 30;
 
 void setupUtil() {
   // the line
@@ -281,55 +300,10 @@ void SetStamp() {
   println("Utility setting: STAMP");
 }
 
-void startReplay() {
-  drawing = false;
-  replaying = true;
-  revReplaying = false;
-  replayStartTime = millis();
-  replayIndex = 0;
-  lastSentIndex = -1;
-}
-
-void clear() {
-  strokeCount = 0;
-  drawing = true;
-  replaying = false;
-  revReplaying = false;
-  utilitySetting = 0;
-  replaySpeed = 1.0;
-  size = 1.0;
-  angle = 0;
-  connectLastPoint = false;
-  
-  cp5.getController("replaySpeed").setValue(replaySpeed);
-  cp5.getController("size").setValue(size);
-  cp5.getController("angle").setValue(angle);
-  
-  println("Cleared.");
-}
-
-
-void setNormalize() {
-  if (utilitySetting != 0) {
-    return;
-  }
-  if (normalize) { // We want to set the stroke to the normalized stroke
-    for (int i = 0; i < normalizedStrokeLength; i++) {
-      stroke[i] = normalizedStroke[i];
-    }
-    strokeCount = normalizedStrokeLength;
-  } else {
-    for (int i = 0; i < originalStrokeLength; i++) {
-      stroke[i] = originalStroke[i];
-    }
-    strokeCount = originalStrokeLength;
-  }
-  startReplay();
-}
-
 void set1() {
   if (strokeCount == 0 && preset1Length != 0) { // we set the current stroke as preset 1
     normalize = false;
+    setNormalize();
     for (int i = 0; i < preset1Length; i++) {
       stroke[i] = preset1[i];
     }
@@ -337,96 +311,121 @@ void set1() {
     setMode1or2();
     setStrokeContents();
     normalize = preset1Normalized;
+    setNormalize();
     startReplay();
   }
   if (strokeCount != 0) { // we set preset1 to the current stroke
+    boolean currentlyNormal = normalize;
+    normalize = false;
+    setNormalize();
     for (int i = 0; i < strokeCount; i++) {
       preset1[i] = stroke[i];
     }
     preset1Length = strokeCount;
+    setStrokeContents();
+    preset1Normalized = currentlyNormal;
+    normalize = currentlyNormal;
+    setNormalize();
+    drawPresetThumbnail(preset1Img, preset1, preset1Length);
+    cp5.get(Button.class, "set1").setImages(preset1Img, preset1Img, preset1Img);
   }
 }
 
 void set2() {
-  if (strokeCount == 0 && preset2Length != 0) {
+  if (strokeCount == 0 && preset2Length != 0) { // we set the current stroke as preset 2
+    normalize = false;
+    setNormalize();
     for (int i = 0; i < preset2Length; i++) {
       stroke[i] = preset2[i];
     }
     strokeCount = preset2Length;
     setMode1or2();
+    setStrokeContents();
+    normalize = preset2Normalized;
+    setNormalize();
     startReplay();
   }
-  if (strokeCount != 0) {
+  if (strokeCount != 0) { // we set preset2 to the current stroke
+    boolean currentlyNormal = normalize;
+    normalize = false;
+    setNormalize();
     for (int i = 0; i < strokeCount; i++) {
       preset2[i] = stroke[i];
     }
     preset2Length = strokeCount;
+    setStrokeContents();
+    preset2Normalized = currentlyNormal;
+    normalize = currentlyNormal;
+    setNormalize();
+    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
+    drawPresetThumbnail(preset2Img, preset2, preset2Length);
+    cp5.get(Button.class, "set2").setImages(preset2Img, preset2Img, preset2Img);
   }
 }
 
+
 void set3() {
-  if (strokeCount == 0 && preset3Length != 0) {
+  if (strokeCount == 0 && preset3Length != 0) { // we set the current stroke as preset 3
+    normalize = false;
+    setNormalize();
     for (int i = 0; i < preset3Length; i++) {
       stroke[i] = preset3[i];
     }
     strokeCount = preset3Length;
     setMode1or2();
+    setStrokeContents();
+    normalize = preset3Normalized;
+    setNormalize();
+    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
     startReplay();
   }
-  if (strokeCount != 0) {
+  if (strokeCount != 0) { // we set preset1 to the current stroke
+    boolean currentlyNormal = normalize;
+    normalize = false;
+    setNormalize();
     for (int i = 0; i < strokeCount; i++) {
       preset3[i] = stroke[i];
     }
     preset3Length = strokeCount;
-  }
-}
-
-void setMode1or2() {
-  // Convert screen coordinates to real coordinates first
-  PVector startPos = stroke[0].pos;
-  PVector endPos = stroke[strokeCount - 1].pos;
-  
-  if (PVector.dist(startPos, endPos) > modalCutoff) {
-    mode = 1;
-    //easingAmount = fullEase;
-    easingAmount = 0;
-  } else {
-    mode = 2;
-    easingAmount = 0;
-  }
-  println("I set the mode to: ", mode, " because the distance between ", startPos, " and ", endPos, " is ", PVector.dist(startPos, endPos));
-}
-
-// sets the original and normalized strokes according to the current storke
-void setStrokeContents() {
-  normalizedStroke = normalizeStroke(stroke, strokeCount, targetSpeed);
-  normalizedStrokeLength = normalizedStroke.length;
-   
-  for (int i = 0; i < strokeCount; i++) {
-    originalStroke[i] = stroke[i];
-  } 
-  originalStrokeLength = strokeCount;
-}
-
-void keyPressed() {
-  if (key == 'c' || key == 'C') {
-    clear();
-  }
-  if (key == 'n' || key == 'N') {
-    if (normalize) {
-      normalize = false;
-    } else {
-      normalize = true;
-    }
+    setStrokeContents();
+    preset3Normalized = currentlyNormal;
+    normalize = currentlyNormal;
     setNormalize();
+    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
+    drawPresetThumbnail(preset3Img, preset3, preset3Length);
+    cp5.get(Button.class, "set3").setImages(preset3Img, preset3Img, preset3Img);
   }
-  if (key == '1') {
-    set1();
+}
+
+void set4() {
+  if (strokeCount == 0 && preset4Length != 0) { // we set the current stroke as preset 4
+    normalize = false;
+    setNormalize();
+    for (int i = 0; i < preset4Length; i++) {
+      stroke[i] = preset4[i];
+    }
+    strokeCount = preset4Length;
+    setMode1or2();
+    setStrokeContents();
+    normalize = preset4Normalized;
+    setNormalize();
+    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
+    startReplay();
   }
-  if (key == '2') {
-    set2();
-  }
-  if (key == '3') {
-    set3();
+  if (strokeCount != 0) { // we set preset1 to the current stroke
+    boolean currentlyNormal = normalize;
+    normalize = false;
+    setNormalize();
+    for (int i = 0; i < strokeCount; i++) {
+      preset4[i] = stroke[i];
+    }
+    preset4Length = strokeCount;
+    setStrokeContents();
+    preset4Normalized = currentlyNormal;
+    normalize = currentlyNormal;
+    setNormalize();
+    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
+    drawPresetThumbnail(preset4Img, preset4, preset4Length);
+    cp5.get(Button.class, "set4").setImages(preset4Img, preset4Img, preset4Img);
   }
 }
