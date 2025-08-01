@@ -308,16 +308,38 @@ void clear() {
   println("Cleared.");
 }
 
+
+void setNormalize() {
+  if (utilitySetting != 0) {
+    return;
+  }
+  if (normalize) { // We want to set the stroke to the normalized stroke
+    for (int i = 0; i < normalizedStrokeLength; i++) {
+      stroke[i] = normalizedStroke[i];
+    }
+    strokeCount = normalizedStrokeLength;
+  } else {
+    for (int i = 0; i < originalStrokeLength; i++) {
+      stroke[i] = originalStroke[i];
+    }
+    strokeCount = originalStrokeLength;
+  }
+  startReplay();
+}
+
 void set1() {
-  if (strokeCount == 0 && preset1Length != 0) {
+  if (strokeCount == 0 && preset1Length != 0) { // we set the current stroke as preset 1
+    normalize = false;
     for (int i = 0; i < preset1Length; i++) {
       stroke[i] = preset1[i];
     }
     strokeCount = preset1Length;
     setMode1or2();
+    setStrokeContents();
+    normalize = preset1Normalized;
     startReplay();
   }
-  if (strokeCount != 0) {
+  if (strokeCount != 0) { // we set preset1 to the current stroke
     for (int i = 0; i < strokeCount; i++) {
       preset1[i] = stroke[i];
     }
@@ -366,14 +388,37 @@ void setMode1or2() {
   
   if (PVector.dist(startPos, endPos) > modalCutoff) {
     mode = 1;
+    //easingAmount = fullEase;
+    easingAmount = 0;
   } else {
     mode = 2;
+    easingAmount = 0;
   }
+  println("I set the mode to: ", mode, " because the distance between ", startPos, " and ", endPos, " is ", PVector.dist(startPos, endPos));
+}
+
+// sets the original and normalized strokes according to the current storke
+void setStrokeContents() {
+  normalizedStroke = normalizeStroke(stroke, strokeCount, targetSpeed);
+  normalizedStrokeLength = normalizedStroke.length;
+   
+  for (int i = 0; i < strokeCount; i++) {
+    originalStroke[i] = stroke[i];
+  } 
+  originalStrokeLength = strokeCount;
 }
 
 void keyPressed() {
   if (key == 'c' || key == 'C') {
     clear();
+  }
+  if (key == 'n' || key == 'N') {
+    if (normalize) {
+      normalize = false;
+    } else {
+      normalize = true;
+    }
+    setNormalize();
   }
   if (key == '1') {
     set1();

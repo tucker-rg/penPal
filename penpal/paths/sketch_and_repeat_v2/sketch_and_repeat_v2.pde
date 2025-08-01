@@ -25,6 +25,17 @@ TimedPoint[] preset3 = new TimedPoint[1000];
 int preset1Length = 0;
 int preset2Length = 0;
 int preset3Length = 0;
+boolean preset1Normalized;
+boolean preset2Normalized;
+boolean preset3Normalized;
+
+// normalization
+boolean normalize = true;
+float targetSpeed = 0.05; // Adjust this value for desired speed (units per second)
+TimedPoint[] originalStroke = new TimedPoint[1000];
+TimedPoint[] normalizedStroke = new TimedPoint[1000];
+int originalStrokeLength = 0;
+int normalizedStrokeLength = 0;
 
 // State variables
 int strokeStartTime;
@@ -38,6 +49,9 @@ int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 String lastCommand = "";
 Table lookup;
+boolean offlineMode = false;
+float easingAmount;
+float fullEase = 0.5; // the amount of easing when the mode is 1
 
 // Controls
 int mode = 1;  // 0: send live, 1: replay, 2: loop
@@ -70,13 +84,15 @@ final float DRAWING_MAX = 12.5;
 
 void setup() {
   size(1000, 600);  // default android window
-  surface.setResizable(true);
+  //surface.setResizable(true);
 
-  // Serial setup
-  printArray(Serial.list());
-  String portName = Serial.list()[3];  // Adjust index as needed
-  myPort = new Serial(this, portName, 57600);
-  
+  if (!offlineMode) {
+    // Serial setup
+    printArray(Serial.list());
+    String portName = Serial.list()[3];  // Adjust index as needed
+    myPort = new Serial(this, portName, 57600);
+  }
+    
   // Load lookup table
   lookup = loadTable("lookup_table.csv", "header");
   
@@ -194,7 +210,7 @@ void draw() {
     }
     endShape();
     
-    // Keep track of where the tip is
+    // Keep track of where the tip is with a red dot
     if (!drawing) {
       PVector currentVertex;
       if (revReplaying) {
@@ -202,9 +218,11 @@ void draw() {
       } else {
         currentVertex = toSquareFromGrid(applyTransformations(stroke[replayIndex].pos));
       }
-      strokeWeight(0);
-      fill(255, 0, 0);
-      circle(currentVertex.x, currentVertex.y, 20);
+      if (inBounds(toScreen(currentVertex))) {
+        strokeWeight(0);
+        fill(255, 0, 0);
+        circle(currentVertex.x, currentVertex.y, 20);
+      }
     }
   }
   
@@ -220,13 +238,8 @@ void draw() {
 // Input handlers
 void mousePressed() {
   if (inBounds()) {
-    connectLastPoint = false;
-    utilitySetting = 0;
-    strokeCount = 0;
     strokeStartTime = millis();
-    drawing = true;
-    replaying = false;
-    revReplaying = false;
+    clear();
   }
 }
 
@@ -244,10 +257,12 @@ void mouseDragged() {
 }
 
 void mouseReleased() {
-  if (inBounds()) {
+  // if (inBounds()) {
+  if (strokeCount > 1 && drawing) {
     if (mode != 0 && strokeCount > 0) {
-      setMode1or2();
-      // Start replay
+      setMode1or2(); // we use this for normalizing the stroke
+      setStrokeContents();
+      setNormalize();
       startReplay();
     }
   }
@@ -272,7 +287,7 @@ void manageMode1() {
     }
     
     if (replayIndex >= strokeCount) {
-      delay(100);
+      //delay(500);
       replaying = false;
       revReplaying = true;
       revReplayStartTime = millis();
@@ -299,7 +314,7 @@ void manageMode1() {
     }
     
     if (revReplayIndex < 0) {
-      delay(100);
+      //delay(500);
       revReplaying = false;
       replaying = true;
       replayStartTime = millis();
@@ -354,11 +369,11 @@ PVector applyTransformations(PVector original) {
   PVector transformed = original.copy();
   
   // Apply scaling
-  println("size: ", size);
+  //println("size: ", size);
   transformed.mult(size);
   
   // Apply rotation
-  println("orientation: ", angle);
+  //println("orientation: ", angle);
   transformed.rotate(radians(-angle));
   
   return transformed;
@@ -390,7 +405,7 @@ boolean inBounds() {
   }
 }
 
-// Modified inBounds to accept PVector
+// Modified inBounds to accept PVector (screen position)
 boolean inBounds(PVector pos) {
   float localX = pos.x - outerOffsetX;
   float localY = pos.y - outerOffsetY;
@@ -435,6 +450,87 @@ PVector toSquareFromGrid(PVector pos) {
   return squareCoord;
 }
 
+TimedPoint[] normalizeStroke(TimedPoint[] original, int originalCount, float targetSpeed) {
+  if (originalCount <= 1) return original;
+
+  // Calculate total stroke length and segment lengths
+  float totalLength = 0;
+  float[] segmentLengths = new float[originalCount - 1];
+  for (int i = 0; i < originalCount - 1; i++) {
+    float segLength = PVector.dist(original[i].pos, original[i + 1].pos);
+    segmentLengths[i] = segLength;
+    totalLength += segLength;
+  }
+
+  // Handle zero-length strokes
+  if (totalLength == 0) {
+    TimedPoint[] flat = new TimedPoint[1];
+    flat[0] = new TimedPoint(original[0].pos.copy(), 0);
+    return flat;
+  }
+
+  // Determine how many points to generate
+  //int newCount = max(int(totalLength * 2), 2);  // at least 2
+  int newCount = max(int(totalLength * 4), 2);  // at least 2
+  TimedPoint[] normalized = new TimedPoint[newCount];
+
+  float totalTime = totalLength / targetSpeed;
+  float timePerPoint = totalTime / (newCount - 1);
+
+  for (int i = 0; i < newCount; i++) {
+    float alpha = (float)i / (newCount - 1);
+    
+    // distance interpolation method
+    float linearAlpha = alpha;
+    float easedAlpha = (1 - cos(PI * alpha)) / 2.0;
+    float distanceAlpha = lerp(linearAlpha, easedAlpha, easingAmount);
+
+    float targetDistance = distanceAlpha * totalLength;
+    float time = i * timePerPoint;
+
+    // Locate the segment for this distance
+    float accumulatedLength = 0;
+    int segmentIndex = 0;
+    while (segmentIndex < originalCount - 1 &&
+           accumulatedLength + segmentLengths[segmentIndex] < targetDistance) {
+      accumulatedLength += segmentLengths[segmentIndex];
+      segmentIndex++;
+    }
+
+    // Clamp to avoid out-of-bounds
+    segmentIndex = min(segmentIndex, originalCount - 2);
+    float segLength = segmentLengths[segmentIndex];
+    float segmentStart = accumulatedLength;
+
+    // Interpolate position within the segment
+    float remainingDistance = targetDistance - segmentStart;
+    float t = (segLength == 0) ? 0 : constrain(remainingDistance / segLength, 0, 1);
+    PVector pos = PVector.lerp(original[segmentIndex].pos, original[segmentIndex + 1].pos, t);
+
+    normalized[i] = new TimedPoint(pos, time);
+  }
+
+  return normalized;
+}
+
+
+PVector getSmoothedPosition(TimedPoint[] stroke, int count, float t) {
+  if (count == 0) return new PVector();
+  if (count == 1 || t <= stroke[0].time) return stroke[0].pos.copy();
+  if (t >= stroke[count - 1].time) return stroke[count - 1].pos.copy();
+
+  for (int i = 0; i < count - 1; i++) {
+    float t0 = stroke[i].time;
+    float t1 = stroke[i + 1].time;
+    if (t >= t0 && t < t1) {
+      float alpha = (t - t0) / (t1 - t0);
+      alpha = alpha * alpha * (3 - 2 * alpha); // smoothstep
+      return PVector.lerp(stroke[i].pos, stroke[i + 1].pos, alpha);
+    }
+  }
+  return stroke[count - 1].pos.copy();
+}
+
 TableRow getExactRow(PVector pos) {
   float rx = (round(pos.x * 2) / 2.0);
   float ry = (round(pos.y * 2) / 2.0) * -1;
@@ -462,7 +558,7 @@ void sendMotorCommand(PVector cmd) {
       row.getInt("servo_1"), 
       row.getInt("servo_2"));
     
-    if (!data.equals(lastCommand)) {
+    if (!data.equals(lastCommand) && !offlineMode) {
       myPort.write(data);
       lastCommand = data;
     }

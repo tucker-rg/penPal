@@ -75,37 +75,6 @@ void setup() {
   
 }
 
-void setupUI() {
-  cp5 = new ControlP5(this);
-  
-  background(200);
-  
-  PFont font = createFont("Arial", 10);
-  cp5.setFont(font);
-  
-  squareSize = height - 2 * outerOffsetY;
-  controlX = outerOffsetX + squareSize + innerOffset;
-  controlW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 3;
-  controlH = controlHeight;
-  spacer = controlH + innerOffset; 
-
-  // Replay speed slider
-  cp5.addSlider("replaySpeed")
-     .setPosition(controlX, outerOffsetY + innerOffset)
-     .setRange(0.1, 3.0)
-     .setValue(replay_speed)
-     .setSize(controlW, controlH);
-     //.setLabel("");  // Hide default label
-
-  // Size slider
-  cp5.addSlider("size")
-     .setPosition(controlX, outerOffsetY + innerOffset + spacer)
-     .setRange(0.1, 3.0)
-     .setValue(size)
-     .setSize(controlW, controlH);
-     //.setLabel("");  // Hide default label
-}
-
 void draw() {
   // drawing square
   stroke(0);
@@ -136,6 +105,37 @@ void draw() {
   // Handle current mode
   if (mode == 1) manageMode1();
   if (mode == 2) manageMode2();
+}
+
+void setupUI() {
+  cp5 = new ControlP5(this);
+  
+  background(200);
+  
+  PFont font = createFont("Arial", 10);
+  cp5.setFont(font);
+  
+  squareSize = height - 2 * outerOffsetY;
+  controlX = outerOffsetX + squareSize + innerOffset;
+  controlW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 3;
+  controlH = controlHeight;
+  spacer = controlH + innerOffset; 
+
+  // Replay speed slider
+  cp5.addSlider("replaySpeed")
+     .setPosition(controlX, outerOffsetY + innerOffset)
+     .setRange(0.1, 3.0)
+     .setValue(replay_speed)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
+
+  // Size slider
+  cp5.addSlider("size")
+     .setPosition(controlX, outerOffsetY + innerOffset + spacer)
+     .setRange(0.1, 3.0)
+     .setValue(size)
+     .setSize(controlW, controlH);
+     //.setLabel("");  // Hide default label
 }
 
 // Input handlers
@@ -182,7 +182,7 @@ void mouseReleased() {
   }
 }
 
-// Mode management (unchanged except for PVector)
+// Mode management
 void manageMode1() {
   if (replaying) {
     float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
