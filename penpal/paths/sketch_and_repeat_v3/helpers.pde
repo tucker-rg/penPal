@@ -1,56 +1,31 @@
 // these are just helper functions, basic stuff
 
 void startReplay() {
-  drawing = false;
-  replaying = true;
-  revReplaying = false;
+  println("starting replay");
+  state = REPLAYING;
   replayStartTime = millis();
   replayIndex = 0;
+  updateUI();
   lastSentIndex = -1;
 } 
 
 void clear() {
-  strokeCount = 0;
-  drawing = true;
-  replaying = false;
-  revReplaying = false;
-  utilitySetting = 0;
-  replaySpeed = 1.0;
-  size = 1.0;
-  angle = 0;
-  connectLastPoint = false;
+  println("clearing.");
+  boolean normalized = currentDoodle.getNormalized();
+  currentDoodle = new Doodle(normalized);
   
-  cp5.getController("replaySpeed").setValue(replaySpeed);
-  cp5.getController("size").setValue(size);
-  cp5.getController("angle").setValue(angle);
-  
-  println("Cleared.");
-}
-
-PVector applyTransformations(PVector original) {
-  PVector transformed = original.copy();
-  
-  // Apply scaling
-  //println("size: ", size);
-  transformed.mult(size);
-  
-  // Apply rotation
-  //println("orientation: ", angle);
-  transformed.rotate(radians(-angle));
-  
-  return transformed;
-}
-
-PVector undoTransformations(PVector transformed) {
-  PVector original = transformed.copy();
-  
-  // Apply scaling
-  original.mult(1 / size);
-  
-  // Apply rotation
-  original.rotate(radians(angle));
-  
-  return original;
+  // clear the currently selected preset too
+  if (selectedPreset == 1) {
+    reset1();
+  } else if (selectedPreset == 2) {
+    reset2();
+  } else if (selectedPreset == 3) {
+    reset3();
+  } else if (selectedPreset == 4) {
+    reset4();
+  }
+  selectedPreset = 0; 
+  updateUI();
 }
 
 // returns if the mouse is currently within the square

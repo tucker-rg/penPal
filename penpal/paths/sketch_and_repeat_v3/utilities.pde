@@ -1,74 +1,57 @@
 // This is where we store the utility motions (line, circle, etc)
 // Also, other preset motions, chosen by the user
 
-TimedPoint[] line = new TimedPoint[2];
-TimedPoint[] triangle = new TimedPoint[3];
-TimedPoint[] circle = new TimedPoint[15];
-TimedPoint[] stamp = new TimedPoint[156];
-
-// Also three custom presets
-TimedPoint[] preset1 = new TimedPoint[1000];
-TimedPoint[] preset2 = new TimedPoint[1000];
-TimedPoint[] preset3 = new TimedPoint[1000];
-TimedPoint[] preset4 = new TimedPoint[1000];
-int preset1Length = 0;
-int preset2Length = 0;
-int preset3Length = 0;
-int preset4Length = 0;
-boolean preset1Normalized;
-boolean preset2Normalized;
-boolean preset3Normalized;
-boolean preset4Normalized;
-
-int lineWait = 75;
-int triangleWait = 50;
-int circleWait = 10;
-int stampWait = 30;
-
-void setupUtil() {
+void createLine() {
   // the line
+  line = new Doodle();
   PVector lPos0 = new PVector(-6.0, 0.0);
   PVector lPos1 = new PVector(6.0, 0.0);
-  line[0] = new TimedPoint(lPos0, 0);
-  line[1] = new TimedPoint(lPos1, 0); // we don't care about time here
+  line.addPoint(new TimedPoint(lPos0));
+  line.addPoint(new TimedPoint(lPos1)); // we don't care about time here
   
+  line.setWaitTime(75);
+  line.setMode(MODE_BRUTE); // BRUTE FORCE  
+  line.setConnectLastPoint(true);
+  // println("i created the line");
+}
+
+void createTriangle() {
   // the triangle
-  PVector[] tPts = new PVector[triangle.length];
-  //tPts[0] = new PVector(0.0, 4.0);
-  //tPts[1] = new PVector(2.2675, 0.0);
-  //tPts[2] = new PVector(4.0, -3.0);
-  //tPts[3] = new PVector(0.0, -3.0);
-  //tPts[4] = new PVector(-4.0, -3.0);
-  //tPts[5] = new PVector(-2.2675, 0.0);
-  //tPts[6] = new PVector(0.0, 4.0);
-  
-  //tPts[0] = new PVector(0.0, 5.8923); // bigger triangle
-  //tPts[1] = new PVector(3.40192, 0.0);
-  //tPts[2] = new PVector(6, -4.5);
-  //tPts[3] = new PVector(0.0, -4.5);
-  //tPts[4] = new PVector(-6, -4.5);
-  //tPts[5] = new PVector(-3.40192, 0.0);
-  
+  triangle = new Doodle();
+  PVector[] tPts = new PVector[3];
   tPts[0] = new PVector(0.0, 5.8923); // three pointed triangle
   tPts[1] = new PVector(6, -4.5);
   tPts[2] = new PVector(-6, -4.5);
-  
-  for (int i = 0; i < triangle.length; i++) {
-    triangle[i] = new TimedPoint(tPts[i], i);
+  for (int i = 0; i < 3; i++) {
+    triangle.addPoint(new TimedPoint(tPts[i]));
   }
-  
+  triangle.setWaitTime(50);
+  triangle.setMode(MODE_BRUTE);
+  triangle.setConnectLastPoint(true);
+  // println("i created the triangle");
+}
+
+void createCircle() {
   // the circle
-  PVector[] cPts = new PVector[circle.length];
-  for (int i = 0; i < circle.length; i++) {
-    float angle = radians(i * (360 / circle.length));
+  circle = new Doodle();
+  PVector[] cPts = new PVector[18];
+  for (int i = 0; i < 18; i++) {
+    float angle = radians(i * (360 / 18));
     float x = 4 * cos(angle);
     float y = 4 * sin(angle);
     cPts[i] = new PVector(x, y);
-    circle[i] = new TimedPoint(cPts[i], 0);
+    circle.addPoint(new TimedPoint(cPts[i]));
   }
+  circle.setWaitTime(10);
+  circle.setMode(MODE_BRUTE);
+  circle.setConnectLastPoint(true);
+  // println("i created the circle");
+}
   
+void createStamp() {
   // the stamp (cat)
-  PVector[] sPts = new PVector[stamp.length];
+  stamp = new Doodle();
+  PVector[] sPts = new PVector[156];
   sPts[0] = new PVector(5.4197, 6.1635);
   sPts[1] = new PVector(5.282, 6.0666);
   sPts[2] = new PVector(5.0659, 5.8751);
@@ -226,206 +209,126 @@ void setupUtil() {
   sPts[154] = new PVector(5.4197, 6.1635);
   sPts[155] = new PVector(5.4197, 6.1635);
   
-  for (int i = 0; i < stamp.length; i++) {
-    stamp[i] = new TimedPoint(sPts[i], i * 30);
+  for (int i = 0; i < 156; i++) {
+    stamp.addPoint(new TimedPoint(sPts[i], i * 30));
   }
+  
+  stamp.setConnectLastPoint(true);
+  // println("i created the stamp");
 }
 
 // Utility functions
-void SetLine() {
+void setLine() {
+  println("setting current doodle to preset: LINE");
+  selectedPreset = 0; // to make sure we don't accidentally delete the previous preset
   clear();
-  utilitySetting = 1;
-  strokeCount = line.length;
-  mode = 3; // BRUTE FORCE
-  waitTime = lineWait;
-  
-  for (int i = 0; i < line.length; i++) {
-    stroke[i] = line[i];
-  }
-  
-  // Start replay
+  selectedPreset = -1;
+  currentDoodle = line.copy();
   startReplay();
-  println("Utility setting: LINE");
 }
 
-void SetTriangle() {
+void setTriangle() {
+  println("setting current doodle to preset: TRIANGLE");
+  selectedPreset = 0;
   clear();
-  utilitySetting = 2;
-  strokeCount = triangle.length;
-  mode = 3; // BRUTE FORCE
-  connectLastPoint = true;
-  waitTime = triangleWait;
-  
-  for (int i = 0; i < triangle.length; i++) {
-    stroke[i] = triangle[i];
-  }
-  
-  // Start replay
+  selectedPreset = -2;
+  currentDoodle = triangle.copy();
   startReplay();
-  println("Utility setting: TRIANGLE");
 }
 
-void SetCircle() {
+void setCircle() {
+  println("setting current doodle to preset: CIRCLE");
+  selectedPreset = 0;
   clear();
-  utilitySetting = 3;
-  strokeCount = circle.length;
-  mode = 3; // BRUTE FORCE
-  connectLastPoint = true;
-  waitTime = circleWait;
-  
-  for (int i = 0; i < circle.length; i++) {
-    stroke[i] = circle[i];
-  }
-  
-  // Start replay
+  selectedPreset = -3;
+  currentDoodle = circle.copy();
   startReplay();
-  println("Utility setting: TRIANGLE");
 }
 
-void SetStamp() {
+void setStamp() {
+  println("setting current doodle to preset: STAMP");
+  selectedPreset = 0;
   clear();
-  utilitySetting = 4;
-  strokeCount = stamp.length;
-  // mode = 3; // BRUTE FORCE
-  mode = 2;
-  connectLastPoint = true;
-  waitTime = stampWait;
-  
-  for (int i = 0; i < stamp.length; i++) {
-    stroke[i] = stamp[i];
-  }
-  
-  // Start replay
+  selectedPreset = -4;
+  currentDoodle = stamp.copy();
   startReplay();
-  println("Utility setting: STAMP");
 }
 
 void set1() {
-  if (strokeCount == 0 && preset1Length != 0) { // we set the current stroke as preset 1
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < preset1Length; i++) {
-      stroke[i] = preset1[i];
-    }
-    strokeCount = preset1Length;
-    setMode1or2();
-    setStrokeContents();
-    normalize = preset1Normalized;
-    setNormalize();
-    startReplay();
-  }
-  if (strokeCount != 0) { // we set preset1 to the current stroke
-    boolean currentlyNormal = normalize;
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < strokeCount; i++) {
-      preset1[i] = stroke[i];
-    }
-    preset1Length = strokeCount;
-    setStrokeContents();
-    preset1Normalized = currentlyNormal;
-    normalize = currentlyNormal;
-    setNormalize();
-    drawPresetThumbnail(preset1Img, preset1, preset1Length);
-    cp5.get(Button.class, "set1").setImages(preset1Img, preset1Img, preset1Img);
-  }
+  println("setting current doodle to custom preset: 1");
+  selectedPreset = 0; // to make sure that we don't accidentally delete our previous preset
+  clear();
+  selectedPreset = 1;
+  currentDoodle = preset1.copy();
+  startReplay();
 }
 
 void set2() {
-  if (strokeCount == 0 && preset2Length != 0) { // we set the current stroke as preset 2
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < preset2Length; i++) {
-      stroke[i] = preset2[i];
-    }
-    strokeCount = preset2Length;
-    setMode1or2();
-    setStrokeContents();
-    normalize = preset2Normalized;
-    setNormalize();
-    startReplay();
-  }
-  if (strokeCount != 0) { // we set preset2 to the current stroke
-    boolean currentlyNormal = normalize;
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < strokeCount; i++) {
-      preset2[i] = stroke[i];
-    }
-    preset2Length = strokeCount;
-    setStrokeContents();
-    preset2Normalized = currentlyNormal;
-    normalize = currentlyNormal;
-    setNormalize();
-    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
-    drawPresetThumbnail(preset2Img, preset2, preset2Length);
-    cp5.get(Button.class, "set2").setImages(preset2Img, preset2Img, preset2Img);
-  }
+  println("setting current doodle to custom preset: 2");
+  selectedPreset = 0; // to make sure that we don't accidentally delete our previous preset
+  clear();
+  selectedPreset = 2;
+  currentDoodle = preset2.copy();
+  startReplay();
 }
 
-
 void set3() {
-  if (strokeCount == 0 && preset3Length != 0) { // we set the current stroke as preset 3
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < preset3Length; i++) {
-      stroke[i] = preset3[i];
-    }
-    strokeCount = preset3Length;
-    setMode1or2();
-    setStrokeContents();
-    normalize = preset3Normalized;
-    setNormalize();
-    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
-    startReplay();
-  }
-  if (strokeCount != 0) { // we set preset1 to the current stroke
-    boolean currentlyNormal = normalize;
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < strokeCount; i++) {
-      preset3[i] = stroke[i];
-    }
-    preset3Length = strokeCount;
-    setStrokeContents();
-    preset3Normalized = currentlyNormal;
-    normalize = currentlyNormal;
-    setNormalize();
-    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
-    drawPresetThumbnail(preset3Img, preset3, preset3Length);
-    cp5.get(Button.class, "set3").setImages(preset3Img, preset3Img, preset3Img);
-  }
+  println("setting current doodle to custom preset: 3");
+  selectedPreset = 0; // to make sure that we don't accidentally delete our previous preset
+  clear();
+  selectedPreset = 3;
+  currentDoodle = preset3.copy();
+  startReplay();
 }
 
 void set4() {
-  if (strokeCount == 0 && preset4Length != 0) { // we set the current stroke as preset 4
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < preset4Length; i++) {
-      stroke[i] = preset4[i];
-    }
-    strokeCount = preset4Length;
-    setMode1or2();
-    setStrokeContents();
-    normalize = preset4Normalized;
-    setNormalize();
-    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
-    startReplay();
+  println("setting current doodle to custom preset: 4");
+  selectedPreset = 0; // to make sure that we don't accidentally delete our previous preset
+  clear();
+  selectedPreset = 4;
+  currentDoodle = preset4.copy();
+  startReplay();
+}
+
+void save() {
+  if (preset1.getCount() == 0) {
+    reset1();
+  } else if (preset2.getCount() == 0) {
+    reset2();
+  } else if (preset3.getCount() == 0) {
+    reset3();
+  } else if (preset4.getCount() == 0) {
+    reset4();
+  } else {
+    println("trying to save but no empty slots");
   }
-  if (strokeCount != 0) { // we set preset1 to the current stroke
-    boolean currentlyNormal = normalize;
-    normalize = false;
-    setNormalize();
-    for (int i = 0; i < strokeCount; i++) {
-      preset4[i] = stroke[i];
-    }
-    preset4Length = strokeCount;
-    setStrokeContents();
-    preset4Normalized = currentlyNormal;
-    normalize = currentlyNormal;
-    setNormalize();
-    cp5.get(Toggle.class, "normalize").setValue(normalize ? 1 : 0);  // sync toggle UI
-    drawPresetThumbnail(preset4Img, preset4, preset4Length);
-    cp5.get(Button.class, "set4").setImages(preset4Img, preset4Img, preset4Img);
-  }
+}
+
+void reset1() {
+  println("resetting preset 1 to the current doodle"); 
+  selectedPreset = 1;
+  // preset1 = currentDoodle.copy();
+  preset1 = currentDoodle.copy();
+  updateUI();
+}
+
+void reset2() {
+  println("resetting preset 2 to the current doodle");
+  selectedPreset = 2;
+  preset2 = currentDoodle.copy();
+  updateUI();
+}
+
+void reset3() {
+  println("resetting preset 3 to the current doodle");
+  selectedPreset = 3;
+  preset3 = currentDoodle.copy();
+  updateUI();
+}
+
+void reset4() {
+  println("resetting preset 4 to the current doodle");
+  selectedPreset = 4;
+  preset4 = currentDoodle.copy();
+  updateUI();
 }

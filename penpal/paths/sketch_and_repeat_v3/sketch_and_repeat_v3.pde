@@ -5,25 +5,12 @@ import controlP5.*;
 ControlP5 cp5;
 Serial myPort;
 
-// Timed drawing point
-class TimedPoint {
-  PVector pos;
-  float time;
-  TimedPoint(PVector p, float t) {
-    pos = p;
-    time = t;
-  }
-}
+// Drawing state/mode variables
+final int MODE_REPLAY = 1, MODE_LOOP = 2, MODE_BRUTE = 3;
+final int DRAWING = 4, REPLAYING = 5, REVREPLAYING = 6;
 
-// To store the current stroke
-TimedPoint[] stroke = new TimedPoint[1000];
-int strokeCount = 0;
-
-// State variables
+int state = DRAWING;
 int strokeStartTime;
-boolean drawing = true;
-boolean replaying = false;
-boolean revReplaying = false;
 int replayStartTime;
 int replayIndex;
 int revReplayStartTime;
@@ -31,27 +18,37 @@ int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 String lastCommand = "";
 Table lookup;
-boolean offlineMode = false;
+boolean offlineMode = true;
 
-// Controls
-int mode = 1;  // 0: send live, 1: replay, 2: loop
-float modalCutoff = 2.0; // out of the -12.5 to 12.5 square range
-float replaySpeed = 1.0;
-float size = 1.0;
-int angle = 0;
-int utilitySetting = 0;  // 0: self draw, 1: line, 2: triangle, 3: circle, 4: stamp (cat)\
-boolean connectLastPoint = false;
-int waitTime;
+// To store the current stroke
+Doodle currentDoodle;
+
+// and the other strokes
+Doodle line;
+Doodle triangle;
+Doodle circle;
+Doodle stamp;
+
+Doodle preset1;
+Doodle preset2;
+Doodle preset3;
+Doodle preset4;
+
+int selectedPreset = 0; // -4 (stamp), -3 (circle), -2 (triangle), -1 (line)
+                              // 1, 2, 3, 4 (custom presets)
 
 // Drawing bounds (of the grid)
 final float DRAWING_MIN = -12.5;
 final float DRAWING_MAX = 12.5;
 
+
 void setup() {
   size(1000, 600);  // default android window
+  background(200);
   //surface.setResizable(true);
   
   if (!offlineMode) {
+    println("setting up serial");
     // Serial setup
     printArray(Serial.list());
     String portName = Serial.list()[3];  // Adjust index as needed
@@ -59,12 +56,27 @@ void setup() {
   }
     
   // Load lookup table
+  println("loading lookup table");
   lookup = loadTable("lookup_table.csv", "header");
   
-  // Fill out the utility functions
-  setupUtil();
+  println("creating the currentDoodle");
+  currentDoodle = new Doodle();
+  
+  println("creating the default doodles");
+  createLine();
+  createTriangle();
+  createCircle();
+  createStamp();
+  
+  println("creating the custom preset doodles");
+  
+  preset1 = new Doodle();
+  preset2 = new Doodle();
+  preset3 = new Doodle();
+  preset4 = new Doodle();
   
   // Draw controls
+  println("drawing the controls");
   setupUI();
   
   println("Setup complete.");
@@ -72,114 +84,107 @@ void setup() {
 
 void draw() {
   background(200);
+  drawDrawingSquare();
   
-  drawSquare();
+  stroke(0, 150, 255);   // Bright blue border
+  strokeWeight(5);
+  noFill();
+  
+  if (selectedPreset <= -1 && selectedPreset >= -4) { // if default
+    int x = controlX + (-selectedPreset - 1) * (imageSize + betweenControls);
+    int y = outerOffsetY + spacer * 3 + betweenControls * 2 + font_size + betweenControls; // Same as buttonY
+    rect(x, y, imageSize, imageSize);
+  }
+
+  // Highlight custom preset
+  if (selectedPreset >= 1 && selectedPreset <= 4) {
+    int x = controlX + (selectedPreset - 1) * (imageSize + betweenControls);
+    int y = presetY;
+    rect(x, y, imageSize, imageSize);
+  }
   
   // Handle modes
-  // We don't need anything for mode0
-  if (mode == 1) manageMode1();
-  if (mode == 2) manageMode2();
-  if (mode == 3) manageMode3(waitTime); // BRUTE FORCE
+  if (state != DRAWING) {
+    if (currentDoodle.mode == 1) manageMode1(currentDoodle);
+    if (currentDoodle.mode == 2) manageMode2(currentDoodle);
+    if (currentDoodle.mode == 3) manageMode3(currentDoodle); // BRUTE FORCE
+  }
 }
 
 // Input handlers
 void mousePressed() {
   if (inBounds()) {
+    selectedPreset = 0;
+    state = DRAWING;
     strokeStartTime = millis();
     clear();
   }
 }
 
 void mouseDragged() {
-  if (drawing) {
+  if (state == DRAWING) {
     PVector pos = new PVector(mouseX, mouseY);
     float t = millis() - strokeStartTime;
-    if (strokeCount < stroke.length && inBounds()) {
-      stroke[strokeCount++] = new TimedPoint(undoTransformations(toGrid(toSquare(pos))), t);
-    }
-    if (mode == 0 && inBounds()) {
-      sendMotorCommand(pos);
+    if (inBounds()) {
+      currentDoodle.addPoint(new TimedPoint(currentDoodle.undoTransformations(toGrid(toSquare(pos))), t));
     }
   }
 }
 
 void mouseReleased() {
   // if (inBounds()) {
-  if (strokeCount > 1 && drawing) {
-    if (mode != 0 && strokeCount > 0) {
-      setMode1or2(); // we use this for normalizing the stroke
-      setStrokeContents();
-      setNormalize();
-      startReplay();
-    }
+  if (currentDoodle.getCount() > 1 && state == DRAWING) {
+    startReplay();
   }
 }
 
-void setMode1or2() {
-  // Convert screen coordinates to real coordinates first
-  PVector startPos = stroke[0].pos;
-  PVector endPos = stroke[strokeCount - 1].pos;
-  
-  if (PVector.dist(startPos, endPos) > modalCutoff) {
-    mode = 1;
-    //easingAmount = fullEase;
-    easingAmount = 0;
-  } else {
-    mode = 2;
-    easingAmount = 0;
-  }
-  println("I set the mode to: ", mode, " because the distance between ", startPos, " and ", endPos, " is ", PVector.dist(startPos, endPos));
-}
-
-// Mode management
-void manageMode1() {
-  if (replaying) {
-    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+// sends the next point given the mode
+void manageMode1(Doodle doodle) {
+  if (state == REPLAYING) {
+    float currentTargetTime = (millis() - replayStartTime) * doodle.getReplaySpeed();
     
     int targetIndex = -1;
-    for (int i = replayIndex; i < strokeCount; i++) {
-      if (stroke[i].time <= currentTargetTime) {
+    for (int i = replayIndex; i < doodle.getCount(); i++) {
+      if (doodle.getPoint(i).time <= currentTargetTime) {
         targetIndex = i;
       } else break;
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(stroke[targetIndex].pos);
+      sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
     
-    if (replayIndex >= strokeCount) {
+    if (replayIndex >= doodle.getCount()) {
       //delay(500);
-      replaying = false;
-      revReplaying = true;
+      state = REVREPLAYING;
       revReplayStartTime = millis();
       lastSentIndex = -1;
-      revReplayIndex = strokeCount - 1;
+      revReplayIndex = doodle.getCount() - 1;
     }
   }
   
-  if (revReplaying) {
-    float currentTargetTime = (millis() - revReplayStartTime) * replaySpeed;
-    float maxTime = stroke[strokeCount-1].time;
+  if (state == REVREPLAYING) {
+    float currentTargetTime = (millis() - revReplayStartTime) * doodle.getReplaySpeed();
+    float maxTime = doodle.getPoint(doodle.getCount() - 1).time;
     
     int targetIndex = -1;
     for (int i = revReplayIndex; i >= 0; i--) {
-      if ((maxTime - stroke[i].time) <= currentTargetTime) {
+      if ((maxTime - doodle.getPoint(i).time) <= currentTargetTime) {
         targetIndex = i;
       } else break;
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(stroke[targetIndex].pos);
+      sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       revReplayIndex = targetIndex - 1;
     }
     
     if (revReplayIndex < 0) {
       //delay(500);
-      revReplaying = false;
-      replaying = true;
+      state = REPLAYING;
       replayStartTime = millis();
       lastSentIndex = -1;
       replayIndex = 0;
@@ -187,24 +192,24 @@ void manageMode1() {
   }
 }
 
-void manageMode2() {
-  if (replaying) {
-    float currentTargetTime = (millis() - replayStartTime) * replaySpeed;
+void manageMode2(Doodle doodle) {
+  if (state == REPLAYING) {
+    float currentTargetTime = (millis() - replayStartTime) * doodle.getReplaySpeed();
     
     int targetIndex = -1;
-    for (int i = replayIndex; i < strokeCount; i++) {
-      if (stroke[i].time <= currentTargetTime) {
+    for (int i = replayIndex; i < doodle.getCount(); i++) {
+      if (doodle.getPoint(i).time <= currentTargetTime) {
         targetIndex = i;
       } else break;
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(stroke[targetIndex].pos);
+      sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
     
-    if (replayIndex >= strokeCount) {
+    if (replayIndex >= doodle.getCount()) {
       replayStartTime = millis();
       lastSentIndex = -1;
       replayIndex = 0;
@@ -212,48 +217,14 @@ void manageMode2() {
   }
 }
 
-void manageMode3(int defaultWait) { // BRUTE FORCE
-  if (replaying) {
-    sendMotorCommand(stroke[replayIndex].pos);
+void manageMode3(Doodle doodle) { // BRUTE FORCE
+  if (state == REPLAYING) {
+    sendMotorCommand(doodle.getPoint(replayIndex).pos);
     replayIndex++;
-    int delayTime = int(defaultWait / replaySpeed);
+    int delayTime = int(doodle.getWaitTime() / doodle.getReplaySpeed());
     delay(delayTime);  // ensure delay is never 0
-    if (replayIndex >= strokeCount) {
+    if (replayIndex >= doodle.getCount()) {
       replayIndex = 0;
     }
   }
-}
-
-// === MOTOR COMMAND ===
-
-// sends grid coordinates to the pen
-void sendMotorCommand(PVector cmd) {
-  PVector transformedCmd = applyTransformations(cmd);
-  PVector flippedCmd = new PVector(transformedCmd.x, -transformedCmd.y); // to account for how the pen is usually held "upside down"
-  
-  TableRow row = getExactRow(flippedCmd);
-  
-  if (row != null) {
-    String data = String.format("0:%d,1:%d,2:%d\n", 
-      row.getInt("servo_0"), 
-      row.getInt("servo_1"), 
-      row.getInt("servo_2"));
-    
-    if (!data.equals(lastCommand) && !offlineMode) {
-      myPort.write(data);
-      lastCommand = data;
-    }
-  }
-}
-
-TableRow getExactRow(PVector pos) {
-  float rx = (round(pos.x * 2) / 2.0);
-  float ry = (round(pos.y * 2) / 2.0) * -1;
-
-  for (TableRow row : lookup.rows()) {
-    if (row.getFloat("X") == rx && row.getFloat("Y") == ry) {
-      return row;
-    }
-  }
-  return null;
 }
