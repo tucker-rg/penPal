@@ -46,9 +46,9 @@ final float DRAWING_MAX = 12.5;
 
 // interum solution, until we can calculate these as we go according to imu data
 float penHeight = 25.0; // must be greater than 13.7m (to account for the pen tip length)
-float roll = -00.0;
-float pitch = 00.0;
-float yaw = 0.0;
+float roll = 0.0; // about the x axis
+float pitch = 00.0; // about the y axis
+float yaw = 0.0; // about the z axis
 
 Mapping map; // this maps between 3d coordinates and tendon lengths
 

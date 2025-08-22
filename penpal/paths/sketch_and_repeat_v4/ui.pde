@@ -315,6 +315,7 @@ void keyPressed() {
     reset4();
   }
   
+  // penHeight
   if (key == '+' || key == '=') {
     penHeight += 1;
     println("current height: ", penHeight);
@@ -322,5 +323,35 @@ void keyPressed() {
   if (key == '-' || key == '_') {
     penHeight -= 1;
     println("current height: ", penHeight);
+  }
+  
+  // yaw
+  if (key == '{' || key == '[') {
+    yaw -= 1;
+    println("current yaw: ", yaw);
+  }
+  if (key == '}' || key == ']') {
+    yaw += 1;
+    println("current yaw: ", yaw);
+  }
+  
+  // pitch
+  if (key == ';' || key == ':') {
+    pitch -= 1;
+    println("current pitch: ", pitch);
+  }
+  if (key == '\'' || key == '\"') {
+    pitch += 1;
+    println("current pitch: ", pitch);
+  }
+  
+  // roll
+  if (key == '.' || key == '>') {
+    roll -= 1;
+    println("current roll: ", roll);
+  }
+  if (key == '/' || key == '?') {
+    roll += 1;
+    println("current roll: ", roll);
   }
 } 

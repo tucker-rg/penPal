@@ -53,7 +53,7 @@ class MotorCommand {
     for (int i = 0; i < 3; i++) {
       motorPositions[i] = arcLengthToMotorPosition(tendonLengths[i]);
     }
-    println("found motor positions: (", motorPositions[0], ", ", motorPositions[1], ", ", motorPositions[2], ")");
+    // println("found motor positions: (", motorPositions[0], ", ", motorPositions[1], ", ", motorPositions[2], ")");
     
     
     if (motorPositions[0] < 10 || motorPositions[0] > 310 || motorPositions[1] < 10 || motorPositions[1] > 310 || motorPositions[2] < 10 || motorPositions[2] > 310) {
