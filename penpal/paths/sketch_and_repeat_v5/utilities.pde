@@ -1,4 +1,4 @@
-// This is where we store the utility motions (line, circle, etc)
+ // This is where we store the utility motions (line, circle, etc)
 // Also, other preset motions, chosen by the user
 
 void createLine() {
@@ -291,23 +291,34 @@ void set4() {
 }
 
 void save() {
-  if (preset1.getCount() == 0) {
+  //if (preset1.getCount() == 0) {
+  //  reset1();
+  //} else if (preset2.getCount() == 0) {
+  //  reset2();
+  //} else if (preset3.getCount() == 0) {
+  //  reset3();
+  //} else if (preset4.getCount() == 0) {
+  //  reset4();
+  //} else {
+  //  println("trying to save but no empty slots");
+  //}
+  
+  if (selectedPreset == 1) {
     reset1();
-  } else if (preset2.getCount() == 0) {
+  } else if (selectedPreset == 2) {
     reset2();
-  } else if (preset3.getCount() == 0) {
+  } else if (selectedPreset == 3) {
     reset3();
-  } else if (preset4.getCount() == 0) {
+  } else if (selectedPreset == 4) {
     reset4();
   } else {
-    println("trying to save but no empty slots");
+    println("trying to save but no valid slot selected!");
   }
 }
 
 void reset1() {
   println("resetting preset 1 to the current doodle"); 
   selectedPreset = 1;
-  // preset1 = currentDoodle.copy();
   preset1 = currentDoodle.copy();
   updateUI();
 }
@@ -331,4 +342,31 @@ void reset4() {
   selectedPreset = 4;
   preset4 = currentDoodle.copy();
   updateUI();
+}
+
+int findFirstAvailableSlot() {
+  if (preset1.getCount() == 0) {
+    return 1;
+  } else if (preset2.getCount() == 0) {
+    return 2;
+  } else if (preset3.getCount() == 0) {
+    return 3;
+  } else if (preset4.getCount() == 0) {
+    return 4;
+  } else {
+    println("no empty slots!");
+    if (selectedPreset == 1) {
+      reset2();
+      return 2;
+    } else if (selectedPreset == 2) {
+      reset3();
+      return 3;
+    } else if (selectedPreset == 3) {
+      reset4();
+      return 4;
+    } else {
+      reset1();
+      return 1;
+    }
+  }
 }

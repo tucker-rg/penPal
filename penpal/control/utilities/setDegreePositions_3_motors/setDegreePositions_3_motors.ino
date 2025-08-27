@@ -74,9 +74,9 @@ void setup() {
   dxl.torqueOn(DXL1);
   dxl.torqueOn(DXL2);
   dxl.torqueOn(DXL3);
-  target1 = 50.0;
-  target2 = 50.0;
-  target3 = 50.0;
+  target1 = 60;
+  target2 = 123;
+  target3 = 72;
   dxl.setGoalPosition(DXL1, target1, UNIT_DEGREE);
   dxl.setGoalPosition(DXL2, target2, UNIT_DEGREE);
   dxl.setGoalPosition(DXL3, target3, UNIT_DEGREE);

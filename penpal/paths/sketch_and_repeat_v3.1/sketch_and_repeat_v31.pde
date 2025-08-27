@@ -16,9 +16,8 @@ int replayIndex;
 int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
-String lastCommand = "";
 Table lookup;
-boolean offlineMode = true;
+boolean offlineMode = false;
 
 // To store the current stroke
 Doodle currentDoodle;
@@ -34,8 +33,12 @@ Doodle preset2;
 Doodle preset3;
 Doodle preset4;
 
-int selectedPreset = 0; // -4 (stamp), -3 (circle), -2 (triangle), -1 (line)
-                              // 1, 2, 3, 4 (custom presets)
+// we automatically select the first preset at launch
+int selectedPreset = 1; // -4 (stamp), -3 (circle), -2 (triangle), -1 (line)
+                        // 1, 2, 3, 4 (custom presets)
+
+// To communicate with the pen
+MotorCommand penControl;
 
 // Drawing bounds (of the grid)
 final float DRAWING_MIN = -12.5;
@@ -52,14 +55,15 @@ void setup() {
     // Serial setup
     printArray(Serial.list());
     String portName = Serial.list()[3];  // Adjust index as needed
-    myPort = new Serial(this, portName, 57600);
+    myPort = new Serial(this, portName, 115200); //57600
+    myPort.bufferUntil('\n');  // trigger serialEvent on newline
   }
     
   // Load lookup table
   println("loading lookup table");
   lookup = loadTable("lookup_table.csv", "header");
   
-  println("creating the currentDoodle");
+  //println("creating the currentDoodle");
   currentDoodle = new Doodle();
   
   println("creating the default doodles");
@@ -74,6 +78,9 @@ void setup() {
   preset2 = new Doodle();
   preset3 = new Doodle();
   preset4 = new Doodle();
+  
+  // To manage the motors
+  penControl = new MotorCommand();
   
   // Draw controls
   println("drawing the controls");
@@ -90,7 +97,11 @@ void draw() {
   strokeWeight(5);
   noFill();
   
-  if (selectedPreset <= -1 && selectedPreset >= -4) { // if default
+  // set the rotation angle
+  penControl.getSetAngle();
+  
+  // highligh default preset
+  if (selectedPreset <= -1 && selectedPreset >= -4) { 
     int x = controlX + (-selectedPreset - 1) * (imageSize + betweenControls);
     int y = outerOffsetY + spacer * 3 + betweenControls * 2 + font_size + betweenControls; // Same as buttonY
     rect(x, y, imageSize, imageSize);
@@ -114,7 +125,7 @@ void draw() {
 // Input handlers
 void mousePressed() {
   if (inBounds()) {
-    selectedPreset = 0;
+    // selectedPreset = 0;
     state = DRAWING;
     strokeStartTime = millis();
     clear();
@@ -151,7 +162,7 @@ void manageMode1(Doodle doodle) {
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(doodle.getPoint(targetIndex).pos);
+      penControl.sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
@@ -177,7 +188,7 @@ void manageMode1(Doodle doodle) {
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(doodle.getPoint(targetIndex).pos);
+      penControl.sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       revReplayIndex = targetIndex - 1;
     }
@@ -204,7 +215,7 @@ void manageMode2(Doodle doodle) {
     }
     
     if (targetIndex != -1 && targetIndex != lastSentIndex) {
-      sendMotorCommand(doodle.getPoint(targetIndex).pos);
+      penControl.sendMotorCommand(doodle.getPoint(targetIndex).pos);
       lastSentIndex = targetIndex;
       replayIndex = targetIndex + 1;
     }
@@ -219,7 +230,7 @@ void manageMode2(Doodle doodle) {
 
 void manageMode3(Doodle doodle) { // BRUTE FORCE
   if (state == REPLAYING) {
-    sendMotorCommand(doodle.getPoint(replayIndex).pos);
+    penControl.sendMotorCommand(doodle.getPoint(replayIndex).pos);
     replayIndex++;
     int delayTime = int(doodle.getWaitTime() / doodle.getReplaySpeed());
     delay(delayTime);  // ensure delay is never 0

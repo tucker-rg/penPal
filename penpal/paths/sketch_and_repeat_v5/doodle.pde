@@ -20,7 +20,10 @@ class Doodle {
   int mode;
   boolean connectLastPoint = false;;
   int waitTime = 0;
+  int normalizedWaitTime = 0;
   // PGraphics img;
+  float timeOffset = 0; // in ms, increases for all the time that was spent transitioning between paths
+  int numStrokes = 0;
   
   // the adjustable characteristics of the doodle
   float replaySpeed = 1.0;
@@ -41,13 +44,92 @@ class Doodle {
   
   // managing the points
   void addPoint(TimedPoint p) {
-    points.add(new TimedPoint(undoTransformations(p.pos), p.time));
+    //float newTime;
+    //if (getCount() == 0) {
+    //  // First point in the doodle
+    //  newTime = p.time;
+    //} else {
+    //  // Always append after the last point
+    //  newTime = getPoint(getCount() - 1).time;
+    //}
+    float newTime = p.time;
+  
+    points.add(new TimedPoint(undoTransformations(p.pos), newTime + timeOffset));
     autoSetMode1or2();
-    
-    // update the normalized points array as well, keeping in mind the optional easing factor
     updateNormalizedPoints();
   }
+
   
+  // accelerate quickly, plateau, then crawl into the end
+  float easeStrongEnd(float t) {
+    float eased = (1 - cos(PI * t)) / 2;  // base smoothstep
+    return 1 - pow(1 - eased, 2.0);       // bias toward the end
+  }
+  
+  // classic smoothstep S-curve (symmetrical)
+  float easeSymmetrical(float t, float k) {
+    // k > 1 = steeper acceleration/deceleration
+    // k < 1 = softer (more gradual)
+    return pow((1 - cos(PI * t)) / 2, k);
+  }
+
+
+
+  void addTransition(TimedPoint newPoint) {
+    if (getCount() == 0) {
+      addPoint(newPoint);
+      return; // nothing to connect from
+    }
+  
+    TimedPoint prevPoint = getPoint(getCount() - 1);
+  
+    // total time for transition
+    float transitionTime = (newPoint.pos.dist(prevPoint.pos)) * 15 + 10;
+    println("this transition will take: ", transitionTime);
+  
+    float h = 3;      // parabola apex lift
+    int steps = 15;   // transition resolution
+  
+    for (int i = 1; i <= steps; i++) {
+      float t = i / float(steps + 1);   // normalized [0,1]
+  
+      // apply easing (slows strongly at destination)
+      //float easedT = easeStrongEnd(t);
+      float easedT = easeSymmetrical(t, 2);
+  
+      // interpolate position with easedT
+      float x = lerp(prevPoint.pos.x, newPoint.pos.x, easedT);
+      float y = lerp(prevPoint.pos.y, newPoint.pos.y, easedT);
+      float baseZ = lerp(prevPoint.pos.z, newPoint.pos.z, easedT);
+  
+      // parabola lift (sharper with exponent)
+      float sharpness = 3.0; // tweak this
+      float raw = pow(t, sharpness) * pow(1 - t, sharpness);
+      float maxVal = pow(0.5, sharpness) * pow(0.5, sharpness);
+      float lift = (raw / maxVal) * h;
+      float z = baseZ - lift;
+
+  
+      // linear interpolation of time (not eased, so clock runs steadily)
+      float time = prevPoint.time + t * transitionTime;
+  
+      // add interpolated point
+      points.add(new TimedPoint(new PVector(x, y, z), time));
+      println("added transition point: ", getPoint(getCount()-1).pos, " at time: ", getPoint(getCount()-1).time);
+    }
+  
+    // finally add the target point *after* the transition
+    float finalTime = prevPoint.time + transitionTime;
+    points.add(new TimedPoint(newPoint.pos.copy(), finalTime));
+  
+    // update bookkeeping
+    timeOffset = finalTime;
+    numStrokes += 1;
+  
+    println("the time offset is now: ", timeOffset);
+  }
+
+
   TimedPoint getPoint(int index) {
     if (index < getCount()) {
       if (normalized) {
@@ -87,9 +169,14 @@ class Doodle {
   
   void setWaitTime(int w) {
     waitTime = w;
+    normalizedWaitTime = w / 10; // just because there are so many more points to worry about
   }
   
   int getWaitTime() {
+    //return waitTime;
+    if (normalized) {
+      return normalizedWaitTime;
+    } 
     return waitTime;
   }
   
@@ -121,7 +208,7 @@ class Doodle {
   }
   
   void setAngle(int a) {
-    angle = a;
+    angle = a%360;
   }
   
   int getAngle() {
@@ -131,7 +218,7 @@ class Doodle {
   void setNormalized(boolean setting) {
     if (normalized != setting) {
       println("setting normalized to: ", setting);
-      normalized = setting; 
+      normalized = setting;
       startReplay(); // this is a bit goofy
     }
   }
@@ -189,79 +276,86 @@ class Doodle {
   
   // generates normalized points given an ArrayList of TimedPoints, a target speed, and an easing factor
   ArrayList<TimedPoint> getNormalizedPoints(float targetSpeed, float easingFactor) {
-    ArrayList<TimedPoint> pointsForNormalizing = points;
-    if (connectLastPoint) {
-      pointsForNormalizing.add(points.get(0));
-    }
-    
-    if (pointsForNormalizing.size() <= 1) {
-      ArrayList<TimedPoint> out = new ArrayList<TimedPoint>();
-      if (pointsForNormalizing.size() == 1) {
-        TimedPoint tp = points.get(0);
-        out.add(new TimedPoint(tp.pos.copy(), tp.time));
-      }
-      return out;
-    }
-  
-    // Calculate total stroke length and segment lengths
-    float totalLength = 0;
-    float[] segmentLengths = new float[pointsForNormalizing.size() - 1];
-    for (int i = 0; i < pointsForNormalizing.size() - 1; i++) {
-      float segLength = PVector.dist(pointsForNormalizing.get(i).pos, pointsForNormalizing.get(i + 1).pos);
-      segmentLengths[i] = segLength;
-      totalLength += segLength;
-    }
-  
-    // Handle zero-length strokes
-    if (totalLength == 0) {
-      ArrayList<TimedPoint> flat = new ArrayList<TimedPoint>();
-      flat.add(new TimedPoint(pointsForNormalizing.get(0).pos.copy(), 0));
-      return flat;
-    }
-  
-    // Determine how many points to generate
-    //int newCount = max(int(totalLength * 2), 2);  // at least 2
-    int newCount = max(int(totalLength * 4), 2);  // at least 2
     ArrayList<TimedPoint> normalized = new ArrayList<>();
   
-    float totalTime = totalLength / targetSpeed;
-    float timePerPoint = totalTime / (newCount - 1);
+    int i = 0;
+    while (i < points.size()) {
+      TimedPoint start = points.get(i);
   
-    for (int i = 0; i < newCount; i++) {
-      float alpha = (float)i / (newCount - 1);
-      
-      // distance interpolation method
-      float linearAlpha = alpha;
-      float easedAlpha = (1 - cos(PI * alpha)) / 2.0;
-      float distanceAlpha = lerp(linearAlpha, easedAlpha, easingFactor);
+      if (abs(start.pos.z) < 1e-3) {
+        // --- Pen-down segment: collect until z != 0 or end ---
+        ArrayList<TimedPoint> seg = new ArrayList<>();
+        while (i < points.size() && abs(points.get(i).pos.z) < 1e-3) {
+          seg.add(points.get(i));
+          i++;
+        }
   
-      float targetDistance = distanceAlpha * totalLength;
-      float time = i * timePerPoint;
-  
-      // Locate the segment for this distance
-      float accumulatedLength = 0;
-      int segmentIndex = 0;
-      while (segmentIndex < pointsForNormalizing.size() - 1 &&
-             accumulatedLength + segmentLengths[segmentIndex] < targetDistance) {
-        accumulatedLength += segmentLengths[segmentIndex];
-        segmentIndex++;
+        if (seg.size() > 1) {
+          // Normalize this contiguous stroke
+          normalized.addAll(normalizeSegment(seg, targetSpeed, easingFactor));
+        } else {
+          // Degenerate case: single z=0 point, just copy it
+          normalized.add(new TimedPoint(seg.get(0).pos.copy(), seg.get(0).time));
+        }
+      } else {
+        // --- Pen-up point: keep untouched ---
+        normalized.add(new TimedPoint(start.pos.copy(), start.time));
+        i++;
       }
-  
-      // Clamp to avoid out-of-bounds
-      segmentIndex = min(segmentIndex, pointsForNormalizing.size() - 2);
-      float segLength = segmentLengths[segmentIndex];
-      float segmentStart = accumulatedLength;
-  
-      // Interpolate position within the segment
-      float remainingDistance = targetDistance - segmentStart;
-      float t = (segLength == 0) ? 0 : constrain(remainingDistance / segLength, 0, 1);
-      PVector pos = PVector.lerp(pointsForNormalizing.get(segmentIndex).pos, pointsForNormalizing.get(segmentIndex + 1).pos, t);
-  
-      normalized.add(new TimedPoint(pos, time));
     }
   
     return normalized;
   }
+  
+  // helper: runs your current normalization logic on a contiguous segment
+  ArrayList<TimedPoint> normalizeSegment(ArrayList<TimedPoint> seg, float targetSpeed, float easingFactor) {
+    ArrayList<TimedPoint> out = new ArrayList<>();
+  
+    // --- compute lengths ---
+    float totalLength = 0;
+    float[] segLengths = new float[seg.size() - 1];
+    for (int j = 0; j < seg.size() - 1; j++) {
+      float l = PVector.dist(seg.get(j).pos, seg.get(j + 1).pos);
+      segLengths[j] = l;
+      totalLength += l;
+    }
+    if (totalLength == 0) {
+      out.add(new TimedPoint(seg.get(0).pos.copy(), seg.get(0).time));
+      return out;
+    }
+  
+    int newCount = max(int(totalLength * 4), 2);
+    float totalTime = totalLength / targetSpeed;
+    float timePerPoint = totalTime / (newCount - 1);
+  
+    for (int k = 0; k < newCount; k++) {
+      float alpha = (float)k / (newCount - 1);
+  
+      float linearAlpha = alpha;
+      float easedAlpha = (1 - cos(PI * alpha)) / 2.0;
+      float distanceAlpha = lerp(linearAlpha, easedAlpha, easingFactor);
+  
+      float targetDist = distanceAlpha * totalLength;
+      float time = seg.get(0).time + k * timePerPoint; // anchor times to first point
+  
+      // find segment
+      float accum = 0;
+      int segIdx = 0;
+      while (segIdx < segLengths.length && accum + segLengths[segIdx] < targetDist) {
+        accum += segLengths[segIdx];
+        segIdx++;
+      }
+      segIdx = min(segIdx, segLengths.length - 1);
+      float remain = targetDist - accum;
+      float t = (segLengths[segIdx] == 0) ? 0 : constrain(remain / segLengths[segIdx], 0, 1);
+  
+      PVector p = PVector.lerp(seg.get(segIdx).pos, seg.get(segIdx + 1).pos, t);
+      out.add(new TimedPoint(p, time));
+    }
+  
+    return out;
+  }
+
   
   void reset() {
     // println("resetting the doodle");

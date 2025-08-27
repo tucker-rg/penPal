@@ -22,7 +22,8 @@ DynamixelShield dxl;
 using namespace ControlTableItem;
 
 unsigned long controlTimer;
-unsigned long lastTimer;
+unsigned long lastReceivedTimer;
+unsigned long lastSentTimer;
 unsigned long INTERVAL = 10;
 
 float input_0 = 0.0;
@@ -34,7 +35,7 @@ void setup() {
   dxl.begin(1000000); // instead of 57600
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
-  Serial.println("You're connected to the network");
+  Serial.println("You're connected to the pen");
 
   dxl.ping(DXL0);
   dxl.ping(DXL1);
@@ -54,12 +55,20 @@ void setup() {
 void loop() {
   controlTimer = millis();
   
-  if (controlTimer - lastTimer > INTERVAL) {
-    lastTimer = controlTimer;
+  if (controlTimer - lastReceivedTimer > INTERVAL) {
+    lastReceivedTimer = controlTimer;
     dxl.setGoalPosition(DXL0, input_0, UNIT_DEGREE);
     dxl.setGoalPosition(DXL1, input_1, UNIT_DEGREE);
     dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE);
   }
+
+  // if (controlTimer - lastSentTimer > INTERVAL * 10) {
+  //   // Read analog value and send back
+  //   lastSentTimer = controlTimer;
+  //   int sensorValue = analogRead(A0);
+  //   Serial.print("A0:"); 
+  //   Serial.println((int)(((-1 * sensorValue) + 511) / 2.842));
+  // }
 
   receiveDataFromProcessing();
 }
@@ -83,8 +92,8 @@ void parseReceivedData(String data) {
     input_1 = data.substring(index1 + 2, index2 - 1).toFloat();
     input_2 = data.substring(index2 + 2).toFloat();
 
-    Serial.print("Received - Input 0: "); Serial.print(input_0);
-    Serial.print(", Input 1: "); Serial.print(input_1);
-    Serial.print(", Input 2: "); Serial.println(input_2);
+    // Serial.print("Received - Input 0: "); Serial.print(input_0);
+    // Serial.print(", Input 1: "); Serial.print(input_1);
+    // Serial.print(", Input 2: "); Serial.println(input_2);
   }
 }
