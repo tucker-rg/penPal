@@ -8,6 +8,7 @@
 
 import processing.serial.*;
 import java.util.*;
+import quickhull3d.*;  // if you put QuickHull3D.java in /code
 
 Serial myPort;
 
@@ -44,10 +45,15 @@ float zoomFactor = 1.0;
 
 ArrayList<PVector> reachablePoints = new ArrayList<PVector>();
 int selectedPoint = -1;
+boolean drawHull = true;
+boolean drawCloud = true;
+boolean drawHullEdges = true;
 
 void setup() {
   size(1000, 700, P3D);
-  findReachablePoints();
+  //findReachablePoints();
+  findReachablePointsSpherical();
+  //findReachablePointsCylindrical();
   // smooth(8);
   // textFont(createFont("SansSerif", 12));
   
@@ -68,15 +74,14 @@ void setup() {
 void draw() {
   background(200);
   draw3DView();
-  drawDimensions();
-  // drawHUD();
+  drawHUD();
 }
 
 void findReachablePoints() {
   // iterate through all the points to find the reachable ones
-  for (float z = 10; z < 70; z+= 5) {
-    for (float x = -50; x <= 50; x+= 5) {
-      for (float y = -50; y <= 50; y+= 5) {
+  for (float z = 10; z < 100; z+= 3) {
+    for (float x = -100; x <= 100; x+= 3) {
+      for (float y = -100; y <= 100; y+= 3) {
         PVector point = new PVector(x, y, z);
         if (isReachable(point)) {
           reachablePoints.add(point);
@@ -86,6 +91,95 @@ void findReachablePoints() {
     }
   }
 }
+
+void findReachablePointsCylindrical() {
+  float zMin = 10;
+  float zMax = 100;
+  float zStep = 2;            // vertical layers
+  float rMax = 100;           // max radius
+  int baseRadialDiv = 30;     // radial rings per layer
+  int baseThetaDiv = 72;      // angular divisions
+
+  for (float z = zMin; z <= zMax; z += zStep) {
+    int numRadial = baseRadialDiv;
+    int numTheta  = baseThetaDiv;
+
+    // total points in this layer
+    int totalPoints = numRadial * numTheta;
+
+    // enforce divisibility by 3
+    if (totalPoints % 3 != 0) {
+      totalPoints += (3 - (totalPoints % 3));  
+    }
+
+    // adjust numTheta (angular resolution) to enforce divisibility
+    numTheta = totalPoints / numRadial;
+
+    for (int i = 1; i <= numRadial; i++) {
+      // distribute radii evenly out to rMax
+      float r = rMax * i / numRadial;
+
+      for (int j = 0; j < numTheta; j++) {
+        float theta = map(j, 0, numTheta, 0, TWO_PI);
+
+        float x = r * cos(theta);
+        float y = r * sin(theta);
+
+        PVector point = new PVector(x, y, z);
+        if (isReachable(point)) {
+          reachablePoints.add(point);
+          println("added point:", point);
+        }
+      }
+    }
+  }
+}
+
+void findReachablePointsSpherical() {
+  float rMin = 10;
+  float rMax = 100;
+  float rStep = 2;            // radial shells
+  int basePhi   = 72;         // baseline latitude divisions
+  int baseTheta = 144;         // baseline longitude divisions
+
+  for (float r = rMin; r <= rMax; r += rStep) {
+    // optionally: scale density with radius if desired
+    int numPhi = basePhi;
+    int numTheta = baseTheta;
+
+    // total points in shell
+    int totalPoints = numPhi * numTheta;
+
+    // round to nearest multiple of 3
+    if (totalPoints % 3 != 0) {
+      totalPoints += (3 - (totalPoints % 3));  
+    }
+
+    // recompute numTheta to match this total (while keeping numPhi fixed)
+    numTheta = totalPoints / numPhi;
+
+    for (int i = 0; i < numPhi; i++) {
+      // uniform in cos(phi)
+      float u = map(i, 0, numPhi-1, -1, 1);  
+
+      for (int j = 0; j < numTheta; j++) {
+        float theta = map(j, 0, numTheta, 0, TWO_PI);
+
+        float x = r * sqrt(1 - u*u) * cos(theta);
+        float y = r * sqrt(1 - u*u) * sin(theta);
+        float z = r * u;
+
+        PVector point = new PVector(x, y, z);
+        if (isReachable(point) && z > 10) {
+          reachablePoints.add(point);
+          println("added point:", point);
+        }
+      }
+    }
+  }
+}
+
+
 
 boolean isReachable(PVector point) {
   float[] tendonLengths = getTendonLengths(point);
@@ -156,13 +250,17 @@ void draw3DView() {
   if (selectedPoint == -1) {
     // draw all red dots
     fill(255,0,0);
-    for (PVector p : reachablePoints) {
-      pushMatrix();
-      translate(p.x, p.y, p.z);
-      sphere(0.2);
-      popMatrix();
+    if (drawCloud) {
+      for (PVector p : reachablePoints) {
+        pushMatrix();
+        translate(p.x, p.y, p.z);
+        sphere(0.2);
+        popMatrix();
+      }
     }
-    drawHull();
+    if (drawHull) {
+      buildHull();
+    }
   } else {
     // first, we draw the other ones anyways
     fill(200, 150);
@@ -309,68 +407,66 @@ void drawTendons(PVector point) {
   }
 }
 
-void drawHull() {
-  if (reachablePoints.isEmpty()) return;
+void drawHUD() {
+  hint(DISABLE_DEPTH_TEST); // draw HUD on top
+  fill(255);
+  textAlign(LEFT, TOP);
+  //String mode = editMode ? "EDIT MODE (top-down): drag vertices & axis endpoints" : "3D VIEW: drag mouse to orbit, mouse wheel to zoom";
+  // text(mode, 10, 10);
+  text("theta: " + degrees(theta, 2), 10, 30);
+  text("Controls: space to toggle shell/point selection", 10, 50);
+  //text("Tip: choose an axis that does NOT intersect the triangle for classic 'triangular-torus-slice' appearance", 10, 70);
+  hint(ENABLE_DEPTH_TEST);
+  
+  // --- print arc lengths of swept edges ---
+  float[] arcLens = new float[3];
+  for (int i = 0; i < 3; i++) {
+    float r = distancePointLine(tri[i], axisP1, axisP2);
+    arcLens[i] = r * abs(theta);
+  }
+  text("Arc lengths (one per vertex sweep): " +
+          nf(arcLens[0],1,3) + ", " +
+          nf(arcLens[1],1,3) + ", " +
+          nf(arcLens[2],1,3), 10, 90);
+}
 
-  // Convert PVector list → double[][] array
-  double[][] points = new double[reachablePoints.size()][3];
+
+void buildHull() {
+  // 1) Build from Point3d[]
+  quickhull3d.Point3d[] pts = new quickhull3d.Point3d[reachablePoints.size()];
   for (int i = 0; i < reachablePoints.size(); i++) {
     PVector p = reachablePoints.get(i);
-    points[i][0] = p.x;
-    points[i][1] = p.y;
-    points[i][2] = p.z;
+    pts[i] = new quickhull3d.Point3d(p.x, p.y, p.z);
   }
 
-  QuickHull3D hull = new QuickHull3D(points);
+  QuickHull3D hull = new QuickHull3D();
+  hull.build(pts);
+
+  // 2) Use the hulls own vertex array for indexing
+  quickhull3d.Point3d[] verts = hull.getVertices();
   int[][] faces = hull.getFaces();
 
-  // Draw the hull
-  fill(200, 100, 100, 80);
-  stroke(255);
-  for (int[] face : faces) {
-    beginShape();
-    for (int idx : face) {
-      double[] v = hull.getVertices()[idx];
-      vertex((float)v[0], (float)v[1], (float)v[2]);
+  // 3) Draw (optionally triangulate if you prefer)
+  fill(100, 100, 255, 100);
+  stroke(0, 0, 100);
+  if (drawHullEdges) {
+    strokeWeight(0.5);
+  } else {
+    strokeWeight(0);
+  }
+
+  for (int i = 0; i < faces.length; i++) {
+    int[] f = faces[i];
+
+    beginShape(); // polygon is convex
+    for (int j = 0; j < f.length; j++) {
+      quickhull3d.Point3d v = verts[f[j]];
+      vertex((float)v.x, (float)v.y, (float)v.z);
     }
     endShape(CLOSE);
   }
 }
 
-
-void drawDimensions() {
-  // compute bounds
-  float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-  float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-  
-  for (int j = 0; j < 3; j++) {
-    minX = min(minX, tri[j].x); maxX = max(maxX, tri[j].x);
-    minY = min(minY, tri[j].y); maxY = max(maxY, tri[j].y);
-    minZ = min(minZ, tri[j].z); maxZ = max(maxZ, tri[j].z);
-  }
-  for (PVector p : reachablePoints) {
-    minX = min(minX, p.x); maxX = max(maxX, p.x);
-    minY = min(minY, p.y); maxY = max(maxY, p.y);
-    minZ = min(minZ, p.z); maxZ = max(maxZ, p.z);
-  }
-
-  hint(DISABLE_DEPTH_TEST);  // overlay on top
-  stroke(0);
-  fill(0);
-  textAlign(CENTER, CENTER);
-  
-  // X dimension
-  drawDimLine(new PVector(minX, minY, minZ), new PVector(maxX, minY, minZ),
-              nf(maxX - minX, 1, 1) + " mm");
-  // Y dimension
-  drawDimLine(new PVector(minX, minY, minZ), new PVector(minX, maxY, minZ),
-              nf(maxY - minY, 1, 1) + " mm");
-  // Z dimension
-  drawDimLine(new PVector(minX, minY, minZ), new PVector(minX, minY, maxZ),
-              nf(maxZ - minZ, 1, 1) + " mm");
-  
-  hint(ENABLE_DEPTH_TEST);
-}
 
 void drawDimLine(PVector p1, PVector p2, String label) {
   float x1 = screenX(p1.x, p1.y, p1.z);
@@ -390,7 +486,7 @@ float[] getTendonLengths(PVector pos) {
   float[] arcLens;
   arcLens = new float[3];
   
-  if (foundLengths && theta < PI / 2) { // we can use the axis and theta stuff (we enforce a 90 degree limit)
+  if (foundLengths && abs(theta) < PI / 2) { // we can use the axis and theta stuff (we enforce a 90 degree limit)
     for (int i = 0; i < 3; i++) {
       float r = distancePointLine(tri[i], axisP1, axisP2);
       arcLens[i] = r * abs(theta);
@@ -595,9 +691,12 @@ float distancePointLine(PVector p, PVector a1, PVector a2) {
 
 // --- centroid helper ---
 PVector centroidOfTriangle() {
-  PVector c = new PVector(0,0,0);
-  for (int i = 0; i < 3; i++) c.add(tri[i]);
-  c.div(3.0);
+  //PVector c = new PVector(0,0,0);
+  //for (int i = 0; i < 3; i++) c.add(tri[i]);
+  //c.div(3.0);
+  //return c;
+  
+  PVector c = new PVector(0, 0, 0);
   return c;
 }
 
@@ -643,5 +742,26 @@ void mouseWheel(MouseEvent event) {
 void keyPressed() {
   if (key == ' ') {
     selectedPoint = -1;
+  }
+  if (key == 'h') {
+    if (drawHull) {
+      drawHull = false;
+    } else {
+      drawHull = true;
+    }
+  }
+  if (key == 'c') {
+    if (drawCloud) {
+      drawCloud = false;
+    } else {
+      drawCloud = true;
+    }
+  }
+  if (key == 'e') {
+    if (drawHullEdges) {
+      drawHullEdges = false;
+    } else {
+      drawHullEdges = true;
+    }
   }
 }
