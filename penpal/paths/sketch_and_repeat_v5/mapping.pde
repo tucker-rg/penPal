@@ -45,7 +45,7 @@ class Mapping {
     float[] arcLens;
     arcLens = new float[3];
     
-    if (foundLengths && theta < 2 * PI / 3) { // we can use the axis and theta stuff (we enforce a 90 degree limit)
+    if (foundLengths && abs(theta) < PI / 2) { // we can use the axis and theta stuff (we enforce a 90 degree limit)
       for (int i = 0; i < 3; i++) {
         float r = distancePointLine(tri[i], axisP1, axisP2);
         arcLens[i] = r * abs(theta);

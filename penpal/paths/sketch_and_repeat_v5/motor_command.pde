@@ -89,27 +89,6 @@ class MotorCommand {
   }
 
   
-  
-  // sets the angle to whatever the potentiometer says
-  //void getSetAngle() {
-  //  int currentTime = millis();
-  //  if (currentTime - lastUpdatedTime > INTERVAL) { // Make sure we only check at the same frequency as we update
-  //    lastUpdatedTime = currentTime;
-  //    String inData = myPort.readStringUntil('\n');
-  //    if (inData != null) {
-  //      inData = trim(inData);
-    
-  //      if (inData.startsWith("A0:")) {
-  //        currentDoodle.setAngle(int(inData.substring(3)));
-  //        updateUI();
-  //        println("Sensor value from Arduino (and the current angle):", currentDoodle.getAngle(), " from a raw value of: ", inData.substring(3));
-  //      } else {
-  //        println("Other data:", inData);
-  //      }
-  //    }
-  //  }
-  //}
-  
   //PVector transform(PVector v) {
   //  float newX = 1 * v.x + - 0.5 * v.y;
   //  float newY = - 0.5 * v.x + 1 * v.y;

@@ -23,7 +23,7 @@ PVector[] tri = {
   new PVector( s/2, -r)
 };
 
-float tipLength = 13.7;
+float tipLength = 13.0;
 float spoolDiameter = 14.0; // in mm
 
 PVector axisP1, axisP2; // axis endpoints (both z = 0)
@@ -35,13 +35,13 @@ PVector lastAxisDir = null;
 float lastTheta = 0;
 boolean lastSolutionOK = false;
 PVector lastTarget = null;
-boolean offlineMode = false;
+boolean offlineMode = true;
 
 MotorCommand penControl = new MotorCommand();
 
 // For viewer
 float sceneRotX = -0.5, sceneRotY = 0.8; // initial 3D view rotation
-float zoomFactor = 1.0;
+float zoomFactor = 4.0;
 
 ArrayList<PVector> reachablePoints = new ArrayList<PVector>();
 int selectedPoint = -1;
@@ -79,9 +79,9 @@ void draw() {
 
 void findReachablePoints() {
   // iterate through all the points to find the reachable ones
-  for (float z = 10; z < 100; z+= 3) {
-    for (float x = -100; x <= 100; x+= 3) {
-      for (float y = -100; y <= 100; y+= 3) {
+  for (float z = 10; z < 50; z+= 3) {
+    for (float x = -100; x <= 100; x+= 10) {
+      for (float y = -100; y <= 100; y+= 10) {
         PVector point = new PVector(x, y, z);
         if (isReachable(point)) {
           reachablePoints.add(point);
@@ -136,9 +136,9 @@ void findReachablePointsCylindrical() {
 }
 
 void findReachablePointsSpherical() {
-  float rMin = 10;
-  float rMax = 100;
-  float rStep = 2;            // radial shells
+  float rMin = 5;
+  float rMax = 70;
+  float rStep = 3;            // radial shells
   int basePhi   = 72;         // baseline latitude divisions
   int baseTheta = 144;         // baseline longitude divisions
 
@@ -178,8 +178,6 @@ void findReachablePointsSpherical() {
     }
   }
 }
-
-
 
 boolean isReachable(PVector point) {
   float[] tendonLengths = getTendonLengths(point);
@@ -258,19 +256,17 @@ void draw3DView() {
         popMatrix();
       }
     }
-    if (drawHull) {
-      buildHull();
-    }
   } else {
     // first, we draw the other ones anyways
     fill(200, 150);
-    for (PVector p : reachablePoints) {
-      pushMatrix();
-      translate(p.x, p.y, p.z);
-      sphere(0.2);
-      popMatrix();
+    if (drawCloud) {
+      for (PVector p : reachablePoints) {
+        pushMatrix();
+        translate(p.x, p.y, p.z);
+        sphere(0.2);
+        popMatrix();
+      }
     }
-    
     // now, draw the selected one in red (and bigger)
     PVector p = reachablePoints.get(selectedPoint);
     fill(255,0,0);
@@ -283,6 +279,10 @@ void draw3DView() {
     // write out the location
     // println("Selected point: (" + nf(p.x,1,2) + ", " + nf(p.y,1,2) + ", " + nf(p.z,1,2) + ")");
     
+  }
+  if (drawHull) {
+    buildHull();
+    //buildSmoothHull();
   }
 
   popMatrix();
@@ -411,13 +411,10 @@ void drawHUD() {
   hint(DISABLE_DEPTH_TEST); // draw HUD on top
   fill(255);
   textAlign(LEFT, TOP);
-  //String mode = editMode ? "EDIT MODE (top-down): drag vertices & axis endpoints" : "3D VIEW: drag mouse to orbit, mouse wheel to zoom";
-  // text(mode, 10, 10);
-  text("theta: " + degrees(theta, 2), 10, 30);
-  text("Controls: space to toggle shell/point selection", 10, 50);
+  text("theta: " + degrees(theta, 2), 10, 10);
+  text("Controls: space to toggle shell/point selection, h to toggle hull, e to toggle hull edges, c to toggle point cloud, r to reset camera", 10, 30);
   //text("Tip: choose an axis that does NOT intersect the triangle for classic 'triangular-torus-slice' appearance", 10, 70);
   hint(ENABLE_DEPTH_TEST);
-  
   // --- print arc lengths of swept edges ---
   float[] arcLens = new float[3];
   for (int i = 0; i < 3; i++) {
@@ -427,7 +424,15 @@ void drawHUD() {
   text("Arc lengths (one per vertex sweep): " +
           nf(arcLens[0],1,3) + ", " +
           nf(arcLens[1],1,3) + ", " +
-          nf(arcLens[2],1,3), 10, 90);
+          nf(arcLens[2],1,3), 10, 50);
+          
+  text("motor commands: " +
+          nf(arcLengthToMotorPosition(arcLens[0])) + ", " +
+          nf(arcLengthToMotorPosition(arcLens[1])) + ", " +
+          nf(arcLengthToMotorPosition(arcLens[2])), 10, 70);
+  if (selectedPoint != -1) {
+    text("position: " + reachablePoints.get(selectedPoint), 10, 90);
+  }
 }
 
 
@@ -467,6 +472,73 @@ void buildHull() {
   }
 }
 
+void buildSmoothHull() {
+  // 1) Build from Point3d[]
+  quickhull3d.Point3d[] pts = new quickhull3d.Point3d[reachablePoints.size()];
+  for (int i = 0; i < reachablePoints.size(); i++) {
+    PVector p = reachablePoints.get(i);
+    pts[i] = new quickhull3d.Point3d(p.x, p.y, p.z);
+  }
+
+  QuickHull3D hull = new QuickHull3D();
+  hull.build(pts);
+
+  // 2) Use the hull's own vertex array for indexing
+  quickhull3d.Point3d[] verts = hull.getVertices();
+  int[][] faces = hull.getFaces();
+
+  // 3) Precompute vertex normals for smooth shading
+  PVector[] vertexNormals = new PVector[verts.length];
+  for (int i = 0; i < verts.length; i++) {
+    vertexNormals[i] = new PVector(0, 0, 0);
+  }
+
+  // Calculate face normals and accumulate to vertices
+  for (int i = 0; i < faces.length; i++) {
+    int[] face = faces[i];
+    if (face.length < 3) continue;
+    
+    // Calculate face normal
+    quickhull3d.Point3d v0 = verts[face[0]];
+    quickhull3d.Point3d v1 = verts[face[1]];
+    quickhull3d.Point3d v2 = verts[face[2]];
+    
+    PVector a = new PVector((float)(v1.x - v0.x), (float)(v1.y - v0.y), (float)(v1.z - v0.z));
+    PVector b = new PVector((float)(v2.x - v0.x), (float)(v2.y - v0.y), (float)(v2.z - v0.z));
+    PVector faceNormal = a.cross(b);
+    faceNormal.normalize();
+    
+    // Accumulate to all vertices of this face
+    for (int j = 0; j < face.length; j++) {
+      int vertexIndex = face[j];
+      vertexNormals[vertexIndex].add(faceNormal);
+    }
+  }
+
+  // Normalize all vertex normals
+  for (int i = 0; i < vertexNormals.length; i++) {
+    vertexNormals[i].normalize();
+  }
+
+  // 4) Draw with smooth shading
+  fill(100, 100, 255, 100);
+  noStroke(); // Remove edges for smoother appearance
+  lights();   // Enable lighting
+  
+  for (int i = 0; i < faces.length; i++) {
+    int[] face = faces[i];
+    
+    beginShape();
+    for (int j = 0; j < face.length; j++) {
+      int vertexIndex = face[j];
+      quickhull3d.Point3d v = verts[vertexIndex];
+      PVector n = vertexNormals[vertexIndex];
+      normal(n.x, n.y, n.z);
+      vertex((float)v.x, (float)v.y, (float)v.z);
+    }
+    endShape(CLOSE);
+  }
+}
 
 void drawDimLine(PVector p1, PVector p2, String label) {
   float x1 = screenX(p1.x, p1.y, p1.z);
@@ -642,6 +714,10 @@ boolean solvePointRotation(PVector S, PVector target, PVector usedNormal /* for 
   axisP2 = PVector.add(A, u);
   theta = thetaFound;
   
+  if (axisIntersectsTriangle()) {
+    return false;
+  }
+  
   return lastSolutionOK;
 }
 
@@ -728,10 +804,54 @@ void mousePressed() {
   }
 }
 
+boolean axisIntersectsTriangle() {
+  // direction vector of axis
+  PVector d = PVector.sub(axisP2, axisP1);
+
+  // check intersection with each triangle edge
+  for (int i = 0; i < 3; i++) {
+    PVector v1 = tri[i];
+    PVector v2 = tri[(i+1) % 3];
+
+    PVector e = PVector.sub(v2, v1);       // edge vector
+    float det = d.x * e.y - d.y * e.x;     // determinant
+
+    if (abs(det) > 1e-6) { // not parallel
+      PVector diff = PVector.sub(v1, axisP1);
+      float t = (diff.x * e.y - diff.y * e.x) / det;
+      float u = (diff.x * d.y - diff.y * d.x) / det;
+      if (u >= 0 && u <= 1) {
+        return true; // infinite line crosses segment
+      }
+    }
+  }
+
+  // finally, check if axisP1 lies inside the triangle -> means line passes through it
+  if (pointInTriangle(axisP1, tri[0], tri[1], tri[2])) return true;
+
+  return false;
+}
+
+// helper: point in triangle
+boolean pointInTriangle(PVector p, PVector a, PVector b, PVector c) {
+  float d1 = sign(p, a, b);
+  float d2 = sign(p, b, c);
+  float d3 = sign(p, c, a);
+  boolean hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+  boolean hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+  return !(hasNeg && hasPos);
+}
+
+// helper to compute orientation sign
+float sign(PVector p1, PVector p2, PVector p3) {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+}
+
 
 void mouseDragged() {
   sceneRotY += (mouseX - pmouseX) * 0.01;
   sceneRotX -= (mouseY - pmouseY) * 0.01;
+  println("y: ", sceneRotY, " x: ", sceneRotX);
 }
 
 void mouseWheel(MouseEvent event) {
@@ -739,29 +859,26 @@ void mouseWheel(MouseEvent event) {
   zoomFactor *= (1 - e * 0.05);
 }
 
+void resetView() {
+  sceneRotX = 0.75;   // look straight down -Z
+  sceneRotY = 0;   // no sideways rotation
+  zoomFactor = 5.0; // default zoom
+}
+
 void keyPressed() {
   if (key == ' ') {
     selectedPoint = -1;
   }
   if (key == 'h') {
-    if (drawHull) {
-      drawHull = false;
-    } else {
-      drawHull = true;
-    }
+    drawHull = !drawHull;
   }
   if (key == 'c') {
-    if (drawCloud) {
-      drawCloud = false;
-    } else {
-      drawCloud = true;
-    }
+    drawCloud = !drawCloud;
   }
   if (key == 'e') {
-    if (drawHullEdges) {
-      drawHullEdges = false;
-    } else {
-      drawHullEdges = true;
-    }
+    drawHullEdges = !drawHullEdges;
+  }
+  if (key == 'r') {   // <--- reset camera with 'r'
+    resetView();
   }
 }
