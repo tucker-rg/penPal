@@ -61,8 +61,8 @@ void setup() {
     println("setting up serial");
     // Serial setup
     printArray(Serial.list());
-    String portName = Serial.list()[3];  // Adjust index as needed
-    myPort = new Serial(this, portName, 57600); //57600
+    String portName = Serial.list()[0];  // Adjust index as needed
+    myPort = new Serial(this, portName, 115200); //57600
     myPort.bufferUntil('\n');  // trigger serialEvent on newline
   }
   
@@ -103,8 +103,8 @@ void draw() {
   strokeWeight(5);
   noFill();
   
-  //print the yawpitchroll angle
-  println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
+  // set the rotation angle
+  // penControl.getSetAngle();
   
   // highligh default preset
   if (selectedPreset <= -1 && selectedPreset >= -4) { 
@@ -256,37 +256,6 @@ void manageMode3(Doodle doodle) { // BRUTE FORCE
     delay(delayTime);  // ensure delay is never 0
     if (replayIndex >= doodle.getCount()) {
       replayIndex = 0;
-    }
-  }
-}
-
-void serialEvent(Serial myPort) { // to read yaw pitch roll
-  // println("i am trying to read from the serial");
-  String inData = myPort.readStringUntil('\n');
-  if (inData == null) return;
-
-  inData = trim(inData);
-
-  if (inData.startsWith("Yaw:")) {
-    String[] parts = splitTokens(inData, " :");
-    if (parts.length >= 6) {
-      yaw = float(parts[1]);
-      pitch = -float(parts[3]);
-      roll = -float(parts[5]);
-      
-      // We want to make sure that it remains between -75 and 75
-      if (pitch < -75.0) {
-        pitch = -75.0;
-      }
-      if (pitch > 75.0) {
-        pitch = 75.0;
-      }
-      if (roll > 75.0) {
-        roll = 75.0;
-      }
-      if (roll < -75.0) {
-        roll = -75.0;
-      }
     }
   }
 }
