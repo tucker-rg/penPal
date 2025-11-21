@@ -355,6 +355,9 @@ void keyPressed() {
   if (key == 'p' || key == 'P') {
     startReplay();
   }
+  if (key == 'o' || key == 'O') {
+    stopReplay();
+  }
   
   if (key == 'y') {
     for (int i = 0; i < currentDoodle.points.size(); i++) {

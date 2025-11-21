@@ -5,7 +5,7 @@ class MotorCommand {
   String lastCommand = "";
   int lastUpdatedTime = 0;
   final int INTERVAL = 10;
-  float spoolDiameter = 14.0; // in mm
+  float spoolDiameter = 17.0; // in mm
   
   MotorCommand() {}
   
@@ -16,7 +16,7 @@ class MotorCommand {
       return;
     }
     
-    cmd.rotate(radians(210)); // to account for weirdness
+    cmd.rotate(radians(0)); // to account for weirdness
     cmd.z = penHeight + cmd.z;
     
     PVector transformedCmd = rotateYawPitchRoll(cmd, -yaw  + 30, -pitch, -roll);

@@ -26,9 +26,9 @@
   #define DEBUG_SERIAL Serial
 #endif
 
-const uint8_t DXL1 = 1;
-const uint8_t DXL2 = 4;
-const uint8_t DXL3 = 7;
+const uint8_t DXL1 = 4;
+const uint8_t DXL2 = 7;
+const uint8_t DXL3 = 6;
 const float DXL_PROTOCOL_VERSION = 2.0;
 float target1;
 float target2;
@@ -56,7 +56,9 @@ void setup() {
   DEBUG_SERIAL.begin(115200);
 
   // Set Port baudrate to 57600bps. This has to match with DYNAMIXEL baudrate.
-  dxl.begin(1000000);
+  //  dxl.begin(1000000);
+  dxl.begin(57600);
+
   // Set Port Protocol Version. This has to match with DYNAMIXEL protocol version.
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
   // Get DYNAMIXEL information
@@ -74,9 +76,9 @@ void setup() {
   dxl.torqueOn(DXL1);
   dxl.torqueOn(DXL2);
   dxl.torqueOn(DXL3);
-  target1 = 200;
-  target2 = 200;
-  target3 = 200;
+  target1 = 150;
+  target2 = 150;
+  target3 = 150;
   dxl.setGoalPosition(DXL1, target1, UNIT_DEGREE);
   dxl.setGoalPosition(DXL2, target2, UNIT_DEGREE);
   dxl.setGoalPosition(DXL3, target3, UNIT_DEGREE);

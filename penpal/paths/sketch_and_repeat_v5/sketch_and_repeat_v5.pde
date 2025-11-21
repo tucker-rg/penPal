@@ -18,6 +18,7 @@ int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 Table lookup;
 boolean offlineMode = false;
+boolean useIMU = false;
 
 // To store the current doodle
 Doodle currentDoodle;
@@ -104,7 +105,7 @@ void draw() {
   noFill();
   
   //print the yawpitchroll angle
-  println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
+  // println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
   
   // highligh default preset
   if (selectedPreset <= -1 && selectedPreset >= -4) { 
@@ -262,31 +263,34 @@ void manageMode3(Doodle doodle) { // BRUTE FORCE
 
 void serialEvent(Serial myPort) { // to read yaw pitch roll
   // println("i am trying to read from the serial");
-  String inData = myPort.readStringUntil('\n');
-  if (inData == null) return;
-
-  inData = trim(inData);
-
-  if (inData.startsWith("Yaw:")) {
-    String[] parts = splitTokens(inData, " :");
-    if (parts.length >= 6) {
-      yaw = float(parts[1]);
-      pitch = -float(parts[3]);
-      roll = -float(parts[5]);
-      
-      // We want to make sure that it remains between -75 and 75
-      if (pitch < -75.0) {
-        pitch = -75.0;
-      }
-      if (pitch > 75.0) {
-        pitch = 75.0;
-      }
-      if (roll > 75.0) {
-        roll = 75.0;
-      }
-      if (roll < -75.0) {
-        roll = -75.0;
+  if (useIMU) {
+    String inData = myPort.readStringUntil('\n');
+    if (inData == null) return;
+  
+    inData = trim(inData);
+  
+    if (inData.startsWith("Yaw:")) {
+      String[] parts = splitTokens(inData, " :");
+      if (parts.length >= 6) {
+        yaw = float(parts[1]) - 120;
+        pitch = -float(parts[3]);
+        roll = -float(parts[5]);
+        
+        // We want to make sure that it remains between -75 and 75
+        if (pitch < -75.0) {
+          pitch = -75.0;
+        }
+        if (pitch > 75.0) {
+          pitch = 75.0;
+        }
+        if (roll > 75.0) {
+          roll = 75.0;
+        }
+        if (roll < -75.0) {
+          roll = -75.0;
+        }
       }
     }
+    println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
   }
 }

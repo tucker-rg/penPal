@@ -14,8 +14,8 @@
 #include <SPI.h>
 
 #define BNO08X_CS   4
-#define BNO08X_INT  3
-#define BNO08X_RST  2
+#define BNO08X_INT  7
+#define BNO08X_RST  6
 
 Adafruit_BNO08x bno08x = Adafruit_BNO08x(BNO08X_RST);
 
@@ -33,9 +33,9 @@ sh2_SensorValue_t sensorValue;
 
 Bounce bounce = Bounce();
 
-const uint8_t DXL0 = 1;
-const uint8_t DXL1 = 4;
-const uint8_t DXL2 = 7;
+const uint8_t DXL0 = 4;
+const uint8_t DXL1 = 7;
+const uint8_t DXL2 = 6;
 const float DXL_PROTOCOL_VERSION = 2.0;
 DynamixelShield dxl;
 
@@ -101,7 +101,8 @@ void loop() {
     lastReceivedTimer = now;
     dxl.setGoalPosition(DXL0, input_0, UNIT_DEGREE);
     dxl.setGoalPosition(DXL1, input_1, UNIT_DEGREE);
-    dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE);
+    // dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE);
+    dxl.setGoalPosition(DXL2, input_2, UNIT_DEGREE); // to account for weirdness with this new motor six
   }
 
   // Read IMU and print every 10 * 5 ms if data available

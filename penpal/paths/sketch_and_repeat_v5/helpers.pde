@@ -13,6 +13,12 @@ void startReplay() {
   }
 } 
 
+void stopReplay() {
+  println("starting replay");
+  state = DRAWING;
+  updateUI();
+} 
+
 void clear() {
   println("clearing.");
   boolean normalized = currentDoodle.getNormalized();
