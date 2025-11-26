@@ -62,8 +62,8 @@ void setup() {
     println("setting up serial");
     // Serial setup
     printArray(Serial.list());
-    String portName = Serial.list()[3];  // Adjust index as needed
-    myPort = new Serial(this, portName, 57600); //57600
+    String portName = Serial.list()[0];  // Adjust index as needed
+    myPort = new Serial(this, portName, 115200); //57600
     myPort.bufferUntil('\n');  // trigger serialEvent on newline
   }
   
@@ -104,8 +104,13 @@ void draw() {
   strokeWeight(5);
   noFill();
   
+<<<<<<< HEAD
   //print the yawpitchroll angle
   // println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
+=======
+  // set the rotation angle
+  // penControl.getSetAngle();
+>>>>>>> af6158c412cf3f0629a29aae8b1a1c80d250879d
   
   // highligh default preset
   if (selectedPreset <= -1 && selectedPreset >= -4) { 
@@ -260,6 +265,7 @@ void manageMode3(Doodle doodle) { // BRUTE FORCE
     }
   }
 }
+<<<<<<< HEAD
 
 void serialEvent(Serial myPort) { // to read yaw pitch roll
   // println("i am trying to read from the serial");
@@ -294,3 +300,5 @@ void serialEvent(Serial myPort) { // to read yaw pitch roll
     println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
   }
 }
+=======
+>>>>>>> af6158c412cf3f0629a29aae8b1a1c80d250879d
