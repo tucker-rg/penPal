@@ -17,7 +17,7 @@ int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 Table lookup;
-boolean offlineMode = false;
+boolean offlineMode = true;
 
 // To store the current stroke
 Doodle currentDoodle;

@@ -17,7 +17,7 @@ int revReplayStartTime;
 int revReplayIndex;
 int lastSentIndex = -1;  // Track last point we actually sent to motors
 Table lookup;
-boolean offlineMode = false;
+boolean offlineMode = true;
 boolean useIMU = false;
 
 // To store the current doodle
@@ -103,14 +103,6 @@ void draw() {
   stroke(0, 150, 255);   // Bright blue border
   strokeWeight(5);
   noFill();
-  
-<<<<<<< HEAD
-  //print the yawpitchroll angle
-  // println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
-=======
-  // set the rotation angle
-  // penControl.getSetAngle();
->>>>>>> af6158c412cf3f0629a29aae8b1a1c80d250879d
   
   // highligh default preset
   if (selectedPreset <= -1 && selectedPreset >= -4) { 
@@ -265,7 +257,6 @@ void manageMode3(Doodle doodle) { // BRUTE FORCE
     }
   }
 }
-<<<<<<< HEAD
 
 void serialEvent(Serial myPort) { // to read yaw pitch roll
   // println("i am trying to read from the serial");
@@ -300,5 +291,3 @@ void serialEvent(Serial myPort) { // to read yaw pitch roll
     println("Yaw:", yaw, "Pitch:", pitch, "Roll:", roll);
   }
 }
-=======
->>>>>>> af6158c412cf3f0629a29aae8b1a1c80d250879d

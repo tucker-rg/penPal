@@ -7,8 +7,7 @@ void createLine() {
   PVector lPos0 = new PVector(-6.0, 0.0);
   PVector lPos1 = new PVector(6.0, 0.0);
   line.addPoint(new TimedPoint(lPos0));
-  line.addPoint(new TimedPoint(lPos1)); // we don't care about time here
-  
+  line.addPoint(new TimedPoint(lPos1));
   line.setWaitTime(75);
   line.setMode(MODE_BRUTE); // BRUTE FORCE  
   line.setConnectLastPoint(true);
@@ -37,8 +36,8 @@ void createCircle() {
   PVector[] cPts = new PVector[18];
   for (int i = 0; i < 18; i++) {
     float angle = radians(i * (360 / 18));
-    float x = 4 * cos(angle);
-    float y = 4 * sin(angle);
+    float x = 6 * cos(angle);
+    float y = 6 * sin(angle);
     cPts[i] = new PVector(x, y);
     circle.addPoint(new TimedPoint(cPts[i]));
   }
@@ -210,9 +209,11 @@ void createStamp() {
   sPts[155] = new PVector(5.4197, 6.1635);
   
   for (int i = 0; i < 156; i++) {
-    stamp.addPoint(new TimedPoint(sPts[i], i * 30));
+    //stamp.addPoint(new TimedPoint(sPts[i], i * 30));
+    stamp.addPoint(new TimedPoint(sPts[i]));
   }
-  
+  stamp.setMode(MODE_BRUTE);
+  stamp.setWaitTime(30);
   stamp.setConnectLastPoint(true);
   // println("i created the stamp");
 }

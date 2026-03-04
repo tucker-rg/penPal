@@ -277,16 +277,33 @@ class Doodle {
   // generates normalized points given an ArrayList of TimedPoints, a target speed, and an easing factor
   ArrayList<TimedPoint> getNormalizedPoints(float targetSpeed, float easingFactor) {
     ArrayList<TimedPoint> normalized = new ArrayList<>();
-  
+    ArrayList<TimedPoint> working = new ArrayList<>();
+    
+    for (TimedPoint tp : points) {
+      working.add(tp);
+    }
+    
+    if (connectLastPoint) {
+      TimedPoint first = points.get(0);
+      TimedPoint last  = points.get(points.size() - 1);
+    
+      if (abs(first.pos.z) < 1e-3 && abs(last.pos.z) < 1e-3) {
+        float dist = PVector.dist(last.pos, first.pos);
+        float loopTime = last.time + dist / targetSpeed;
+    
+        working.add(new TimedPoint(first.pos.copy(), loopTime));
+      }
+    }
+    
     int i = 0;
-    while (i < points.size()) {
-      TimedPoint start = points.get(i);
+    while (i < working.size()) {
+      TimedPoint start = working.get(i);
   
       if (abs(start.pos.z) < 1e-3) {
         // --- Pen-down segment: collect until z != 0 or end ---
         ArrayList<TimedPoint> seg = new ArrayList<>();
-        while (i < points.size() && abs(points.get(i).pos.z) < 1e-3) {
-          seg.add(points.get(i));
+        while (i < working.size() && abs(working.get(i).pos.z) < 1e-3) {
+          seg.add(working.get(i));
           i++;
         }
   

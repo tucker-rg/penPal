@@ -54,6 +54,9 @@ void setup() {
   Serial.begin(115200);  // For communication with Processing
   dxl.begin(1000000); // instead of 57600
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
+
+  SPI.begin();
+  delay(10); 
   
   while (!Serial) delay(10);
   Serial.println("You're connected to the pen");

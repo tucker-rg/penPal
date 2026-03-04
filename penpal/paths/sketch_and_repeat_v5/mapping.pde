@@ -112,10 +112,10 @@ class Mapping {
     return ok;
   }
   
-  // --- low-level solver that maps point S -> target by rotation about some axis with direction u in z=0 ---
+  // --- low-level solver that maps point S to target by rotation about some axis with direction u in z=0 ---
   // The function chooses u perpendicular to the XY projection of (target - S) (the necessary condition),
   // then solves two linear equations for axis point A = (Ax,Ay,0), then computes theta.
-  // Returns true if verification distance < tolerance.
+  // Returns true if verification distance less than tolerance.
   boolean solvePointRotation(PVector S, PVector target, PVector usedNormal /* for reporting only */) {
     final float EPS = 1e-9f;
     PVector d = PVector.sub(target, S);

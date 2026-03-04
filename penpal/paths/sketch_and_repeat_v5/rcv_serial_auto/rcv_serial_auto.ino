@@ -13,8 +13,8 @@
 
 Bounce bounce = Bounce();
 
-const uint8_t DXL0 = 1;
-const uint8_t DXL1 = 4;
+const uint8_t DXL0 = 4;
+const uint8_t DXL1 = 6;
 const uint8_t DXL2 = 7;
 const float DXL_PROTOCOL_VERSION = 2.0;
 DynamixelShield dxl;
@@ -41,7 +41,7 @@ int tick = 1;
 
 void setup() {
   Serial.begin(57600);  // For communication with Processing
-  dxl.begin(1000000);
+  dxl.begin(57600);
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
   Serial.println("You're connected to the pen");

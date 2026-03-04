@@ -259,7 +259,7 @@ void drawDrawingSquare() {
   if (currentDoodle.getCount() > 0) {
     boolean drawing = false;
     PVector firstSegVertex = null;
-    final float zEps = 1e-3; // treat |z| < zEps as "down"
+    final float zEps = 1e-3; // treat |z| less zEps as "down"
 
     for (int i = 0; i < currentDoodle.getCount(); i++) {
       // IMPORTANT: use the original z to decide segmentation
