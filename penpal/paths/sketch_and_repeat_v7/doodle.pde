@@ -92,11 +92,11 @@ class Stroke {
   
   // Build a transition stroke with smooth interpolation
   private void buildTransition(PVector start, PVector end, float h) {
-    float transitionTime = start.dist(end) * 15 + 10;
+    float transitionTime = start.dist(end) * 10 + 50;
     println("This transition will take: ", transitionTime);
 
     // float h = 3;      // parabola apex lift
-    int steps = 15;   // transition resolution
+    int steps = 30;   // transition resolution
 
     for (int i = 1; i <= steps; i++) {
       float t = i / float(steps + 1);   // normalized [0,1]
@@ -162,7 +162,12 @@ class Doodle {
 
   // Add point to the latest stroke
   void addPoint(TimedPoint p) {
-    if (strokes.isEmpty() || p == null) return;
+    if (p == null) return;
+
+    if (strokes.isEmpty()) { // if strokes is empty, just add a blank stroke.
+      Stroke newStroke = new Stroke();
+      strokes.add(newStroke);
+    }
     strokes.get(strokes.size() - 1).addPoint(p);
   }
 
@@ -200,6 +205,22 @@ class Doodle {
     return null;
   }
 
+  TimedPoint getFirstPoint() {
+    if (strokes.isEmpty()) return null;
+    Stroke firstStroke = strokes.get(0);
+    if (firstStroke.getCount() == 0) return null;
+    return firstStroke.getPointAtIndex(0);
+  }
+
+  TimedPoint getLastPoint() {
+    Stroke lastStroke = getLastStroke();
+    if (lastStroke == null) return null;
+    int lenLastStroke = lastStroke.getCount();
+    if (lenLastStroke == 0) return null;
+    TimedPoint lastPoint = lastStroke.getPointAtIndex(lenLastStroke-1);
+    return lastPoint;
+  }
+
   Doodle copy() {
     Doodle copy = new Doodle();
     for (Stroke s : this.strokes) {
@@ -207,4 +228,36 @@ class Doodle {
     }
     return copy;
   }
+
+  // TimedPoint applyTransformations(TimedPoint original) {
+  //   PVector originalPVector = original.pos;
+  //   PVector transformedPVector = originalPVector.copy();
+    
+  //   // Apply scaling
+  //   //println("size: ", size);
+  //   transformedPVector.mult(size);
+    
+  //   // Apply rotation
+  //   //println("orientation: ", angle);
+  //   // transformed.rotate(radians(-angle));
+    
+  //   TimedPoint transformed = new TimedPoint(transformedPVector, original.time);
+  //   return transformed;
+  // }
+  
+  // TimedPoint undoTransformations(TimedPoint original) {
+  //   PVector originalPVector = original.pos;
+  //   PVector untransformedPVector = originalPVector.copy();
+    
+  //   // Apply scaling
+  //   //println("size: ", size);
+  //   untransformedPVector.mult(size);
+    
+  //   // Apply rotation
+  //   //println("orientation: ", angle);
+  //   // transformed.rotate(radians(-angle));
+    
+  //   TimedPoint untransformed = new TimedPoint(untransformedPVector, original.time);
+  //   return untransformed;
+  // }
 }

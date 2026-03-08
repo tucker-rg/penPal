@@ -2,11 +2,15 @@
 // Top-level enums
 // -------------------
 enum PlaybackMode {
-  PINGPONG, LOOP, JUMP
+  PINGPONG, // Goes back and forth (implemented but not called)
+  LOOP, // Goes straight from the last point to the first point, no jump or delay
+  JUMP // Jumps from the last point to the first point
 }
 
 enum PlaybackState {
-  IDLE, PLAYING, PAUSED
+  IDLE, // AWAITING INSTRUCTIONS, will only send lastPoint. Doodles and other settings may be out of date. 
+  PLAYING, // SENDING NEW POINTS, prograssing with time
+  PAUSED // PAUSED, etc.
 }
 
 // -------------------
@@ -34,7 +38,10 @@ class PlaybackManager {
 
   // -- Settings --
   private float        replaySpeed   = 1.0;
+  // private float        size          = 1.0;
+  private float        normalizedTargetSpeed = 0.05; // this is how fast a normalized doodle goes at speed 1.0
   PlaybackMode         mode;
+  private boolean      usePingPong    = true; // you can decide to jump or ping pong
   boolean              useNormalized = true; // default value
   private float        easingFactor  = 0.05;
 
@@ -93,18 +100,14 @@ class PlaybackManager {
     } 
   }
 
-  void clear() {
-    Doodle clearningDoodle = new Doodle();
-    TimedPoint clearingPoint = new TimedPoint(new PVector(0, 0), 0);
-    clearningDoodle.addPoint(clearingPoint);
-    resetAndReturn();
+  void makeIdle() {
     state = PlaybackState.IDLE;
   }
 
   void setDoodle(Doodle d) {
     if (d == null) return;
     doodleOriginal   = d;
-    doodleNormalized = normalizer.getNormalizedDoodle(d, replaySpeed * 0.05, easingFactor);
+    doodleNormalized = normalizer.getNormalizedDoodle(d, normalizedTargetSpeed, easingFactor);
     autoSetMode();
   }
 
@@ -113,16 +116,19 @@ class PlaybackManager {
     reset();
   }
 
-  // Changing speed rebuilds the normalized doodle and resets cleanly
+  // Changing speed
   void setReplaySpeed(float speed) {
-    replaySpeed      = max(0.01, speed);
-    doodleNormalized = normalizer.getNormalizedDoodle(doodleOriginal, replaySpeed * 0.05, easingFactor);
-    reset();
+    float oldSpeed = replaySpeed;
+    replaySpeed = max(0.01, speed);
+
+    // re-anchor so current position doesn't jump
+    float rawElapsed = parent.millis() - strokeStartTime;
+    float scaledElapsed = rawElapsed * oldSpeed; // where we actually are
+    strokeStartTime = (long)(parent.millis() - scaledElapsed / replaySpeed);
   }
 
   void swapUseNormalized() {
     useNormalized = !useNormalized;
-    // clampIndices()
     resetAndReturn();
   }
 
@@ -131,7 +137,11 @@ class PlaybackManager {
     resetAndReturn();
   }
 
-  void reset() { // resets the playback settings
+  // void setSize(float newSize) {
+  //   size = max(0.01, newSize);
+  // }
+
+  void reset() { // resets the playback settings, but not the Doodles
     currentStrokeIndex  = 0;
     currentPointIndex   = 0;
     isReversing         = false;
@@ -140,15 +150,19 @@ class PlaybackManager {
     strokeStartTime     = parent.millis();
   }
 
-  void resetAndReturn() { // resets the playback settings and sends the tip back to the start
+  void resetAndReturn() { // resets the playback settings and sends the tip back to the start (as a jump)
     reset();
     startRepositioning();
   }
 
-  boolean getPlaying() { // returns true if currently playing
+  boolean isPlaying() { // returns true if currently playing
     if (state == PlaybackState.PLAYING) {
       return true;
     } return false;
+  }
+
+  float getReplaySpeed() { // returns the replay speed
+    return replaySpeed;
   }
 
   // =============================================================
@@ -184,13 +198,14 @@ class PlaybackManager {
                           ? findPointForElapsedReverse(stroke, elapsed)
                           : findPointForElapsed(stroke, elapsed);
     if (tp == null) return null;
-
+    
+    lastPoint = tp.pos;   
+    
     if (elapsed >= stroke.getDuration()) {
       advanceStroke(doodle);
     }
     
-    lastPoint = tp.pos;
-    return tp.pos;
+    return lastPoint;
   }
 
   // =============================================================
@@ -216,15 +231,16 @@ class PlaybackManager {
 
   private void advanceStrokeReverse(Doodle doodle) {
     currentStrokeIndex--;
-    currentPointIndex = doodle.getCount()-1;   // reset; findPointForElapsedReverse scans from end
-    strokeStartTime   = parent.millis();
+    if (currentStrokeIndex >= 0) {
+      currentPointIndex = doodle.getStroke(currentStrokeIndex).getCount() - 1; 
+    }
+    strokeStartTime = parent.millis();
 
     if (currentStrokeIndex < 0) {
-      // Reached the start while reversing — flip direction
-      isReversing        = false;
+      isReversing = false;
       currentStrokeIndex = 0;
-      currentPointIndex  = 0;
-      strokeStartTime    = parent.millis();
+      currentPointIndex = 0;
+      strokeStartTime = parent.millis();
     }
   }
 
@@ -238,10 +254,9 @@ class PlaybackManager {
         break;
 
       case PINGPONG:
-        // Flip direction; start walking backwards from the last stroke
         isReversing        = true;
         currentStrokeIndex = doodle.getStrokeCount() - 1;
-        currentPointIndex  = 0;
+        currentPointIndex  = doodle.getStroke(currentStrokeIndex).getCount() - 1;
         strokeStartTime    = parent.millis();
         break;
 
@@ -256,11 +271,12 @@ class PlaybackManager {
   // =============================================================
 
   private void startJumpReturn(Doodle doodle) {
-    PVector endPos   = doodle.getPoint(doodle.getCount() - 1).pos;
-    PVector startPos = doodle.getPoint(0).pos;
+    PVector endPos   = doodle.getLastPoint().pos;
+    PVector startPos = doodle.getFirstPoint().pos;
 
     jumpReturnStroke    = new Stroke(endPos, startPos);
     isPlayingJumpReturn = true;
+    isPlayingRepositioning = false;
     currentPointIndex   = 0;
     strokeStartTime     = parent.millis();
   }
@@ -361,41 +377,21 @@ class PlaybackManager {
   // Reverse scan: treat elapsed as time from the END of the stroke backwards.
   // We mirror the timestamp: reversedTime = duration - tp.time
   private TimedPoint findPointForElapsedReverse(Stroke stroke, float elapsed) {
-    float      duration = stroke.getDuration();
-    TimedPoint result   = null;
+    float duration = stroke.getDuration();
+    TimedPoint result = null;
 
-    // Scan backwards from the end of the stroke
-    int startScan = (currentPointIndex == 0)
-                      ? stroke.getCount() - 1
-                      : currentPointIndex;
-
-    for (int i = startScan; i >= 0; i--) {
+    for (int i = currentPointIndex; i >= 0; i--) {
       TimedPoint tp = stroke.getPointAtIndex(i);
       if (tp == null) continue;
       float reversedTime = duration - tp.time;
       if (reversedTime <= elapsed) {
-        result            = tp;
+        result = tp;
         currentPointIndex = i;
-        break;
+      } else {
+        break;  // mirror of forward scan
       }
     }
     return result;
-  }
-
-  // =============================================================
-  // Safe index clamping (call after any doodle/mode switch)
-  // =============================================================
-  private void clampIndices() {
-    Doodle doodle = getCurrentDoodle();
-    if (doodle == null || doodle.getStrokeCount() == 0) {
-      currentStrokeIndex = 0;
-      currentPointIndex  = 0;
-      return;
-    }
-    currentStrokeIndex = constrain(currentStrokeIndex, 0, doodle.getStrokeCount() - 1);
-    Stroke stroke = doodle.getStroke(currentStrokeIndex);
-    int maxPoint  = (stroke != null) ? max(0, stroke.getCount() - 1) : 0;
-    currentPointIndex = constrain(currentPointIndex, 0, maxPoint);
   }
 
   // =============================================================
@@ -404,12 +400,19 @@ class PlaybackManager {
   private void autoSetMode() {
     Doodle d = getCurrentDoodle();
     if (d == null || d.getCount() == 0) return;
-    PVector startPos = d.getPoint(0).pos;
-    PVector endPos   = d.getPoint(d.getCount() - 1).pos;
-    mode = (PVector.dist(startPos, endPos) > 2.0)
-             ? PlaybackMode.JUMP
-            //  ? PlaybackMode.PINGPONG
-             : PlaybackMode.LOOP;
+    PVector startPos = d.getFirstPoint().pos;
+    PVector endPos   = d.getLastPoint().pos;
+    if (usePingPong == true) {
+      mode = (PVector.dist(startPos, endPos) > 2.0)
+              //  ? PlaybackMode.JUMP
+              ? PlaybackMode.PINGPONG
+              : PlaybackMode.LOOP;
+    } else {
+      mode = (PVector.dist(startPos, endPos) > 2.0)
+               ? PlaybackMode.JUMP
+              // ? PlaybackMode.PINGPONG
+              : PlaybackMode.LOOP;
+    }
   }
 
   Doodle getCurrentDoodle() {

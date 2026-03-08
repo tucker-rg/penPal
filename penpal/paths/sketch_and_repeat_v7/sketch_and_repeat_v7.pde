@@ -12,43 +12,57 @@ final float GRID_MAX = 12.5;
 
 // System state
 static enum State {
-  DRAWING, // currently drawing
+  DRAWING, // currently drawing (i.e. the mouse is being pressed in the squre)
   PLAYBACK, // handled by the playback manager, including pause
-  DORMANT // nothing at all
+  DORMANT // nothing at all, (i.e. the playback manager has yet to be built for a new doodle)
 }
 
-State systemState = State.DRAWING;
+State systemState = State.DORMANT;
 ControlP5 cp5;
 UIManager ui; // To manage UI
-Doodle currentDoodle; // Holds the current doodle
+Doodle currentDoodle; // Holds the current doodle, one of the presets
 MotorCommand motorCommand; // To communicate with the pen
 PlaybackManager playbackManager; // To manage playback
 
+// Presets
+Doodle[] presets = new Doodle[8]; 
+int selectedPreset = 0;
+
 void setup() {
-  size(1000, 600);
+  // size(1000, 600);
+  fullScreen();
   cp5 = new ControlP5(this);
 
-  currentDoodle = new Doodle();
+  for (int i = 0; i < 4; i++) {
+    presets[i] = new Doodle();
+  }
+  presets[4] = createLine();
+  presets[5] = createTriangle();
+  presets[6] = createCircle();
+  presets[7] = createStamp();
+
+  currentDoodle = presets[selectedPreset].copy(); // We make sure to only set currentDoodle to copies of the presets
+
   motorCommand = new MotorCommand();
   playbackManager = new PlaybackManager(this);
-  ui = new UIManager(this, cp5, currentDoodle);
+  ui = new UIManager(this, cp5);
 }
 
 void draw() {
   PVector newPoint = null;
 
-  newPoint = playbackManager.update(); // get the latest point (if playback, otherwise returns the last point sent)
-  motorCommand.sendMotorCommand(newPoint); // send the latest motor command
+  newPoint = playbackManager.update(); // get the latest point (playbackManager accounts for idle or paused)
+  motorCommand.sendMotorCommand(newPoint); // send the latest point
 
   background(180);
 
-  ui.draw(newPoint, currentDoodle); // draw the ui
+  ui.draw(newPoint, currentDoodle); // draw the ui with new updates
   
 }
 
 // handle mouse input, drawing things
 int strokeStartMillis;
-final float MIN_DIST = 0.5; // threshold in grid space
+final float MIN_DIST = 0.2; // threshold in grid space
 
 void mousePressed() {
   // Get the grid position
@@ -58,6 +72,7 @@ void mousePressed() {
   
   systemState = State.DRAWING;
   strokeStartMillis = millis();
+  playbackManager.pause();
   
   if (currentDoodle.getCount() > 0) { // if this isn't the first stroke, we have to deal with transition
     currentDoodle.addTransitionStroke(gridPos);
@@ -115,8 +130,7 @@ void handleTogglePlayback() {
 
 void handleClear() {
   currentDoodle = new Doodle();
-  // playbackManager = new PlaybackManager(this);
-  playbackManager.clear();
+  playbackManager.makeIdle();
   systemState = State.DORMANT;
   println("handleClear called!");
 }
@@ -129,9 +143,59 @@ void replaySpeed(float val) {
   playbackManager.setReplaySpeed(val);
 }
 
-void controlEvent(ControlEvent theEvent) {
-  println("controlEvent fired: " + theEvent.getName());
+void controlEvent(ControlEvent e) {
+  println("controlEvent fired: " + e.getName());
 }
+
+
+void selectPreset(int i) {
+  playbackManager.makeIdle();
+  currentDoodle = presets[i].copy();
+  selectedPreset = i;
+  systemState = State.DORMANT;
+}
+
+void save() {
+  if (selectedPreset >= 4 && selectedPreset < 8) {
+    println("Cannot overwrite default preset!");
+    return;
+  }
+  presets[selectedPreset] = currentDoodle;
+  ui.resetThumbnail(selectedPreset);
+}
+
+void set0() {
+  selectPreset(0);
+}
+
+void set1() {
+  selectPreset(1);
+}
+
+void set2() {
+  selectPreset(2);
+}
+
+void set3() {
+  selectPreset(3);
+}
+
+void set4() {
+  selectPreset(4);
+}
+
+void set5() {
+  selectPreset(5);
+}
+
+void set6() {
+  selectPreset(6);
+}
+
+void set7() {
+  selectPreset(7);
+}
+
 
 // keyboard shortcuts
 void keyPressed() {

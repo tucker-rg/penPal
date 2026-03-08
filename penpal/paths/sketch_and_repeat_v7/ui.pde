@@ -4,15 +4,14 @@ class UIManager {
 
   // ===== Dependencies =====
   PApplet parent;
-  Doodle currentDoodle;
 
   // Control p5
   ControlP5 cp5;
 
   // ===== Layout =====
-  int outerOffsetX = 80;
-  int outerOffsetY = 70;
-  int squareSize;
+  int squareSize; // this is determined according to display
+  int outerOffsetX = 200; // change these for different size screen
+  int outerOffsetY = 200; // change ...
 
   int innerOffset = 30; // for the sliders
   int controlHeight = 25;
@@ -22,19 +21,18 @@ class UIManager {
   int font_size = 10;
   int imageSize;
   int miscButtonW;
-  // PGraphics preset1Img, preset2Img, preset3Img, preset4Img;
+  PGraphics[] presetThumbnails = new PGraphics[presets.length];
   int presetY;
 
   // ===== Mini Constructor =====
-  UIManager(PApplet parent, ControlP5 cp5, Doodle currentDoodle) {
+  UIManager(PApplet parent, ControlP5 cp5) {
     this.parent = parent;
     this.cp5 = cp5;
-    this.currentDoodle = currentDoodle;
     squareSize = parent.height - 2 * outerOffsetY;
     setupUI();
   }
   
-  // sets up the UI (nothing for now)
+  // sets up the UI
   void setupUI() {
     PFont font = createFont("Arial", font_size);
     cp5.setFont(font);
@@ -51,42 +49,36 @@ class UIManager {
     buttonW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 5;
     buttonH = buttonW / 2;
     
-    // PGraphics lineImg = drawThumbnail(line, imageSize);
-    // PGraphics triangleImg = drawThumbnail(triangle, imageSize);
-    // PGraphics circleImg = drawThumbnail(circle, imageSize);
-    // PGraphics stampImg = drawThumbnail(stamp, imageSize);
+    // lineImg = drawThumbnail(line, imageSize);
+    // triangleImg = drawThumbnail(triangle, imageSize);
+    // circleImg = drawThumbnail(circle, imageSize);
+    // stampImg = drawThumbnail(stamp, imageSize);
     
-    // PGraphics preset1Img = drawThumbnail(preset1, imageSize);
-    // PGraphics preset2Img = drawThumbnail(preset2, imageSize);
-    // PGraphics preset3Img = drawThumbnail(preset3, imageSize);
-    // PGraphics preset4Img = drawThumbnail(preset4, imageSize);
+    for (int i = 0; i < presetThumbnails.length; i++) {
+      presetThumbnails[i] = drawThumbnail(presets[i], imageSize);
+    }
     
     // Replay speed slider
     cp5.addSlider("replaySpeed")
     .setLabel("speed")
     .setPosition(controlX, outerOffsetY + betweenControls)
     .setRange(0.1, 2.0)
-    // .plugTo(currentDoodle, "replaySpeed")
-    // .setValue(currentDoodle.replaySpeed)
+    .setValue(1.0)
     .setSize(controlW, controlH);
 
     // Size slider
     cp5.addSlider("size") 
       .setPosition(controlX, outerOffsetY + spacer + betweenControls)
       .setRange(0.1, 2.0)
-      // .plugTo(currentDoodle, "size")
-      // .setValue(currentDoodle.size)
+      .setValue(1.0)
       .setSize(controlW, controlH);
-      //.setLabel("");  // Hide default label
       
     // Rotation slider
     cp5.addSlider("angle")
       .setPosition(controlX, outerOffsetY + spacer + spacer + betweenControls)
       .setRange(-180, 180)
-      // .plugTo(currentDoodle, "angle")
-      // .setValue(currentDoodle.angle)
+      .setValue(0)
       .setSize(controlW, controlH);
-      //.setLabel("orientation");  // Hide default label
     
     int buttonY = outerOffsetY + spacer * 3 + betweenControls * 2 + font_size + betweenControls;
     
@@ -97,54 +89,54 @@ class UIManager {
       .setColor(color(255));
 
     // Image buttons using Button with custom images
-    // cp5.addButton("setLine")
-    //   .setPosition(controlX, buttonY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(lineImg, lineImg, lineImg); // normal, over, pressed
+    cp5.addButton("set4")
+      .setPosition(controlX, buttonY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[4], presetThumbnails[4], presetThumbnails[4]); // normal, over, pressed
 
-    // cp5.addButton("setTriangle")
-    //   .setPosition(controlX + imageSize + betweenControls, buttonY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(triangleImg, triangleImg, triangleImg);
+    cp5.addButton("set5")
+      .setPosition(controlX + imageSize + betweenControls, buttonY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[5], presetThumbnails[5], presetThumbnails[5]);
 
-    // cp5.addButton("setCircle")
-    //   .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls, buttonY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(circleImg, circleImg, circleImg);
+    cp5.addButton("set6")
+      .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls, buttonY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[6], presetThumbnails[6], presetThumbnails[6]);
 
-    // cp5.addButton("setStamp")
-    //   .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls + imageSize + betweenControls, buttonY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(stampImg, stampImg, stampImg);
+    cp5.addButton("set7")
+      .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls + imageSize + betweenControls, buttonY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[7], presetThumbnails[7], presetThumbnails[7]);
     
     // Preset buttons
     presetY = buttonY + imageSize + betweenControls + font_size + betweenControls;
     
-    // // Add label for custom strokes (above preset buttons)
-    // cp5.addLabel("CUSTOM PRESETS:")
-    //   .setPosition(controlX, presetY - font_size - betweenControls)  // Position above the preset buttons
-    //   .setFont(font)
-    //   .setColor(color(255));
+    // Add label for custom strokes (above preset buttons)
+    cp5.addLabel("CUSTOM PRESETS:")
+      .setPosition(controlX, presetY - font_size - betweenControls)  // Position above the preset buttons
+      .setFont(font)
+      .setColor(color(255));
       
-    // cp5.addButton("set1")
-    //   .setPosition(controlX, presetY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(preset1Img, preset1Img, preset1Img);
+    cp5.addButton("set0")
+      .setPosition(controlX, presetY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[0], presetThumbnails[0], presetThumbnails[0]);
 
-    // cp5.addButton("set2")
-    //   .setPosition(controlX + imageSize + betweenControls, presetY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(preset2Img, preset2Img, preset2Img);
+    cp5.addButton("set1")
+      .setPosition(controlX + imageSize + betweenControls, presetY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[1], presetThumbnails[1], presetThumbnails[1]);
 
-    // cp5.addButton("set3")
-    //   .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls, presetY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(preset3Img, preset3Img, preset3Img);
+    cp5.addButton("set2")
+      .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls, presetY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[2], presetThumbnails[2], presetThumbnails[2]);
       
-    // cp5.addButton("set4")
-    //   .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls + imageSize + betweenControls, presetY)
-    //   .setSize(imageSize, imageSize)
-    //   .setImages(preset4Img, preset4Img, preset4Img);
+    cp5.addButton("set3")
+      .setPosition(controlX + imageSize + betweenControls + imageSize + betweenControls + imageSize + betweenControls, presetY)
+      .setSize(imageSize, imageSize)
+      .setImages(presetThumbnails[3], presetThumbnails[3], presetThumbnails[3]);
       
     int miscButtonY = presetY + imageSize + innerOffset;
     
@@ -161,9 +153,9 @@ class UIManager {
       .setSize(miscButtonW, height - miscButtonY - betweenControls - outerOffsetY);
     
     // save button
-    // cp5.addButton("save")
-    //   .setPosition(controlX + miscButtonW + betweenControls + miscButtonW + betweenControls, miscButtonY)
-    //   .setSize(miscButtonW, height - miscButtonY - betweenControls - outerOffsetY);
+    cp5.addButton("save")
+      .setPosition(controlX + miscButtonW + betweenControls + miscButtonW + betweenControls, miscButtonY)
+      .setSize(miscButtonW, height - miscButtonY - betweenControls - outerOffsetY);
       
     // create a toggle
     cp5.addToggle("handleNormalize")
@@ -175,7 +167,7 @@ class UIManager {
 
   void syncUI() {
     setControllerValue("handleNormalize", playbackManager.useNormalized ? 1 : 0);
-    setControllerValue("handleTogglePlayback", playbackManager.getPlaying() ? 1 : 0);
+    setControllerValue("handleTogglePlayback", playbackManager.isPlaying() ? 1 : 0);
   }
 
   void setControllerValue(String name, float val) {
@@ -190,11 +182,34 @@ class UIManager {
     if (latestPoint != null && systemState == State.PLAYBACK) {
       drawTip(latestPoint, 255); // with no transparency
     } else {
-      // drawTip(latestPoint, 50); // just the outline
+      drawTip(latestPoint, 50); // just the outline
     }
-
+    
     // the buttons should reflect the state
     syncUI();
+
+    highlightPreset();
+  }
+
+  // Highlight preset
+  void highlightPreset() {
+    stroke(0, 150, 255);   // Bright blue border
+    strokeWeight(5);
+    noFill();
+
+    // Highlight custom preset
+    if (selectedPreset >= 0 && selectedPreset < 4) {
+      int x = controlX + (selectedPreset) * (imageSize + betweenControls);
+      int y = presetY;
+      rect(x, y, imageSize, imageSize);
+    }
+
+    // Highlight default preset
+    if (selectedPreset >= 4 && selectedPreset < 8) {
+      int x = controlX + (selectedPreset-4) * (imageSize + betweenControls);
+      int y = outerOffsetY + spacer * 3 + betweenControls * 2 + font_size + betweenControls; // Same as buttonY
+      rect(x, y, imageSize, imageSize);
+    }
   }
 
   // draws the drawing square, and the current doodle
@@ -262,6 +277,86 @@ class UIManager {
       fill(255, 0, 0, transparency);
       circle(currentVertex.x, currentVertex.y, 20);
     }
+  }
+
+  PGraphics drawThumbnail(Doodle doodle, int imageSize) {
+    PGraphics pg = createGraphics(imageSize, imageSize);
+    int count = doodle.getCount();
+    
+    pg.beginDraw();
+    pg.background(240);
+    pg.stroke(0);
+    pg.strokeWeight(2);
+    pg.noFill();
+    
+    if (count > 0) {
+      float padding = 10;
+      
+      // Step 1: Find bounds
+      float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+      float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+      for (int i = 0; i < count; i++) {
+        float x = doodle.getPoint(i).pos.x;
+        float y = doodle.getPoint(i).pos.y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+
+      float strokeWidth = maxX - minX;
+      float strokeHeight = maxY - minY;
+
+      // Step 2: Compute scale
+      float availableW = imageSize - 2 * padding;
+      float availableH = imageSize - 2 * padding;
+      float scale = min(availableW / strokeWidth, availableH / strokeHeight);
+
+      // Step 3: Compute center offsets
+      float centerX = (minX + maxX) / 2;
+      float centerY = (minY + maxY) / 2;
+      float canvasCenter = imageSize / 2;
+
+      // Step 4: Draw with segmentation logic
+      boolean drawing = false;
+      final float zEps = 1e-3; // pen up/down threshold
+
+      for (int i = 0; i < count; i++) {
+        TimedPoint tp = doodle.getPoint(i);
+        PVector worldPos = tp.pos;
+        boolean penDown = abs(worldPos.z) < zEps;
+
+        float x = (worldPos.x - centerX) * scale + canvasCenter;
+        float y = -(worldPos.y - centerY) * scale + canvasCenter;
+
+        if (penDown) {
+          if (!drawing) {
+            pg.beginShape();
+            drawing = true;
+          }
+          pg.vertex(x, y);
+        } else {
+          if (drawing) {
+            pg.endShape();
+            drawing = false;
+          }
+        }
+      }
+
+      // close last stroke if still drawing
+      if (drawing) {
+        pg.endShape();
+      }
+    }
+    
+    pg.endDraw();
+    return pg;
+  }
+
+  void resetThumbnail(int i) {
+    presetThumbnails[i] = drawThumbnail(presets[i], imageSize);
+    cp5.getController("set" + i)
+     .setImages(presetThumbnails[i], presetThumbnails[i], presetThumbnails[i]);
   }
   
   // coordinate conversions
