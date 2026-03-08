@@ -66,6 +66,11 @@ class Stroke {
     return points.get(points.size() - 1).pos;
   }
 
+  PVector getFirstPoint() {
+    if (points.isEmpty()) return null;
+    return points.get(0).pos;
+  }
+
   void addPoint(TimedPoint p) {
     if (p != null) points.add(p);
   }
@@ -92,7 +97,8 @@ class Stroke {
   
   // Build a transition stroke with smooth interpolation
   private void buildTransition(PVector start, PVector end, float h) {
-    float transitionTime = start.dist(end) * 10 + 50;
+    // float transitionTime = start.dist(end) * 15 + 100;
+    float transitionTime = 1000;
     println("This transition will take: ", transitionTime);
 
     // float h = 3;      // parabola apex lift

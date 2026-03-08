@@ -29,8 +29,8 @@ Doodle[] presets = new Doodle[8];
 int selectedPreset = 0;
 
 void setup() {
-  // size(1000, 600);
-  fullScreen();
+  size(1000, 600);
+  // fullScreen();
   cp5 = new ControlP5(this);
 
   for (int i = 0; i < 4; i++) {
@@ -74,9 +74,9 @@ void mousePressed() {
   strokeStartMillis = millis();
   playbackManager.pause();
   
-  if (currentDoodle.getCount() > 0) { // if this isn't the first stroke, we have to deal with transition
-    currentDoodle.addTransitionStroke(gridPos);
-  }
+  // if (currentDoodle.getCount() > 0) { // if this isn't the first stroke, we have to deal with transition
+  //   currentDoodle.addTransitionStroke(gridPos);
+  // }
   
   currentDoodle.addDrawingStroke();
   appendGridPos(gridPos);

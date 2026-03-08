@@ -10,15 +10,17 @@ class UIManager {
 
   // ===== Layout =====
   int squareSize; // this is determined according to display
-  int outerOffsetX = 200; // change these for different size screen
-  int outerOffsetY = 200; // change ...
+  int outerOffsetX = 90; // change these for different size screen (200 for full screen, 90 for small)
+  int outerOffsetY = 75; // change ... (200 for full screen, 75 for small)
 
   int innerOffset = 30; // for the sliders
   int controlHeight = 25;
   int betweenControls = 15;
+  int font_size = 10;
+
+  // ====== Initialize =====
   int controlX, controlW, controlH, spacer;
   int buttonW, buttonH; // for the buttons
-  int font_size = 10;
   int imageSize;
   int miscButtonW;
   PGraphics[] presetThumbnails = new PGraphics[presets.length];
