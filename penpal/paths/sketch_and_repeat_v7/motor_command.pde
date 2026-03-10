@@ -18,7 +18,24 @@ class MotorCommand {
       return;
     }
 
-    PVector transformedCmd = new PVector(cmd.x, cmd.y, h);
+    // float theta = TWO_PI/3.0 - PI/6.0;  // 120° - 30° = 90°    // float theta = 0;
+    float theta = TWO_PI/3.0;
+
+    float x = cmd.x;
+    float y = cmd.y;
+
+    float xr = x * cos(theta) - y * sin(theta);
+    float yr = x * sin(theta) + y * cos(theta);
+
+    PVector transformedCmd = new PVector(xr, yr, cmd.z + 30);
+
+    // float theta = HALF_PI;
+    // PVector transformedCmd = cmd.copy();
+    // transformedCmd.rotate(theta);
+    // transformedCmd.z += 30;
+
+    // PVector transformedCmd = new PVector(cmd.x, cmd.y, cmd.z + 30);
+    // print(transformedCmd);
     
     float[] tendonLengths = map.getTendonLengths(transformedCmd);
     if (tendonLengths == null) return;

@@ -97,7 +97,7 @@ class Stroke {
   
   // Build a transition stroke with smooth interpolation
   private void buildTransition(PVector start, PVector end, float h) {
-    float transitionTime = start.dist(end) * 15 + 50;
+    float transitionTime = start.dist(end) * 20 + 50;
     // float transitionTime = 1000;
     println("This transition will take: ", transitionTime);
 
@@ -117,7 +117,7 @@ class Stroke {
       float raw = pow(t, sharpness) * pow(1 - t, sharpness);
       float maxVal = pow(0.5, sharpness) * pow(0.5, sharpness);
       float lift = (raw / maxVal) * h;
-      float z = baseZ + lift; // NOT MINUS
+      float z = baseZ - lift; // NOT MINUS
 
       float time = t * transitionTime;
 
