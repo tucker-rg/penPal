@@ -230,7 +230,7 @@ class PlaybackManager {
 
   void resetAndReturn() {
     reset();
-    startReturnToStart(3);
+    startReturnToStart(5);
   }
 
   boolean isPlaying() {

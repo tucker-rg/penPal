@@ -38,8 +38,8 @@ Doodle currentDoodle; // Holds the current doodle, one of the presets
 // settings like angle, speed, size handled by the playback manager
 
 void setup() {
-  size(1000, 600);
-  // fullScreen();
+  // size(1000, 600);
+  fullScreen();
 
   if (!OFFLINE) {
     println("setting up serial");
@@ -73,7 +73,6 @@ void draw() {
   newPoint = playbackManager.update(); // get the latest point (playbackManager accounts for idle or paused)
   if (!OFFLINE && newPoint != null) {
     motorCommand.sendMotorCommand(newPoint, 30.0); // send the latest point
-    // print(newPoint.x, newPoint.y, newPoint.z);
   }
 
   background(180);

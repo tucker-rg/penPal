@@ -30,7 +30,7 @@ float input_2 = 0.0;
 
 void setup() {
   Serial.begin(115200);
-  dxl.begin(1000000);
+  dxl.begin(57600);
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
   while (!Serial) delay(10);

@@ -19,8 +19,8 @@ class UIManager {
 
   // ===== Layout =====
   int squareSize; // this is determined according to display
-  int outerOffsetX = 90; // change these for different size screen (200 for full screen, 90 for small)
-  int outerOffsetY = 75; // change ... (200 for full screen, 75 for small)
+  int outerOffsetX = 200; // change these for different size screen (200 for full screen, 90 for small)
+  int outerOffsetY = 200; // change ... (200 for full screen, 75 for small)
 
   int innerOffset = 30; // for the sliders
   int controlHeight = 25;
