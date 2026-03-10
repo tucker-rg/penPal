@@ -5,6 +5,7 @@
 // imports
 import java.util.*;
 import controlP5.*;
+import processing.serial.*;
 
 // ===== Coordinate System =====
 final float GRID_MIN = -12.5;
@@ -17,20 +18,38 @@ static enum State {
   DORMANT // nothing at all, (i.e. the playback manager has yet to be built for a new doodle)
 }
 
+// Pen communication
+Serial myPort;
+final boolean OFFLINE = true; // for testing purpose, otherwise set FALSE
+
 State systemState = State.DORMANT;
 ControlP5 cp5;
 UIManager ui; // To manage UI
-Doodle currentDoodle; // Holds the current doodle, one of the presets
 MotorCommand motorCommand; // To communicate with the pen
 PlaybackManager playbackManager; // To manage playback
 
 // Presets
-Doodle[] presets = new Doodle[8]; 
+final int NUM_PRESETS = 8; // this is hard coded
+Doodle[] presets = new Doodle[NUM_PRESETS]; 
 int selectedPreset = 0;
+
+// current state
+Doodle currentDoodle; // Holds the current doodle, one of the presets
+// settings like angle, speed, size handled by the playback manager
 
 void setup() {
   size(1000, 600);
   // fullScreen();
+
+  if (!OFFLINE) {
+    println("setting up serial");
+    // Serial setup
+    printArray(Serial.list());
+    String portName = Serial.list()[0];  // Adjust index as needed
+    myPort = new Serial(this, portName, 115200); //57600
+    myPort.bufferUntil('\n');  // trigger serialEvent on newline
+  }
+
   cp5 = new ControlP5(this);
 
   for (int i = 0; i < 4; i++) {
@@ -52,11 +71,13 @@ void draw() {
   PVector newPoint = null;
 
   newPoint = playbackManager.update(); // get the latest point (playbackManager accounts for idle or paused)
-  motorCommand.sendMotorCommand(newPoint); // send the latest point
+  if (!OFFLINE) {
+    motorCommand.sendMotorCommand(newPoint, 25.0, 0, 0, 0); // send the latest point
+  }
 
   background(180);
 
-  ui.draw(newPoint, currentDoodle); // draw the ui with new updates
+  ui.draw(currentDoodle, newPoint, selectedPreset); // draw the ui with new updates
   
 }
 
@@ -74,10 +95,6 @@ void mousePressed() {
   strokeStartMillis = millis();
   playbackManager.pause();
   
-  // if (currentDoodle.getCount() > 0) { // if this isn't the first stroke, we have to deal with transition
-  //   currentDoodle.addTransitionStroke(gridPos);
-  // }
-  
   currentDoodle.addDrawingStroke();
   appendGridPos(gridPos);
 }
@@ -87,6 +104,7 @@ void mouseDragged() {
   
   PVector gridPos = ui.getGridPos();
   if (gridPos == null) { // i.e. out of bounds
+    playbackManager.setDoodle(currentDoodle);
     systemState = State.DORMANT;
     return;
   }
@@ -94,10 +112,10 @@ void mouseDragged() {
 }
 
 void mouseReleased() {
-  PVector gridPos = ui.getGridPos();
-  if (gridPos == null) return; // i.e. out of bounds
-
-  systemState = State.DORMANT;
+  if (systemState == State.DRAWING) {
+    playbackManager.setDoodle(currentDoodle);
+    systemState = State.DORMANT;
+  }
 }
 
 void appendGridPos(PVector grid) {
@@ -112,7 +130,7 @@ void appendGridPos(PVector grid) {
     return;
   }
 
-  currentDoodle.addPoint(new TimedPoint(grid, t));
+  currentDoodle.addPoint(new TimedPoint(playbackManager.undoTransformations(grid), t));
 }
 
 void handleTogglePlayback() {
@@ -130,9 +148,8 @@ void handleTogglePlayback() {
 
 void handleClear() {
   currentDoodle = new Doodle();
-  playbackManager.makeIdle();
+  playbackManager.clear(currentDoodle);
   systemState = State.DORMANT;
-  println("handleClear called!");
 }
 
 void handleNormalize() {
@@ -143,6 +160,14 @@ void replaySpeed(float val) {
   playbackManager.setReplaySpeed(val);
 }
 
+void angle(int a) {
+  playbackManager.setAngle(a);
+}
+
+void size(float s) {
+  playbackManager.setSize(s);
+}
+
 void controlEvent(ControlEvent e) {
   println("controlEvent fired: " + e.getName());
 }
@@ -150,8 +175,9 @@ void controlEvent(ControlEvent e) {
 
 void selectPreset(int i) {
   playbackManager.makeIdle();
-  currentDoodle = presets[i].copy();
+  currentDoodle = presets[i].copy(); 
   selectedPreset = i;
+  playbackManager.setDoodle(currentDoodle);
   systemState = State.DORMANT;
 }
 

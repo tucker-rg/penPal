@@ -1,5 +1,14 @@
 // The UI Manager draws the user interface, handles coordinate conversion
-// UI Manager does NOT handle buttons, those are global
+
+
+// UI manager has access to playback_manager and main (see drawDoodle() and syncUI())
+// ideally, there should be a UIState class which contains:
+// class UIState {
+//   boolean isPlaying;
+//   boolean useNormalized;
+//   float size, maxSize;
+//   float angle, minAngle, maxAngle;
+  
 class UIManager {
 
   // ===== Dependencies =====
@@ -23,7 +32,7 @@ class UIManager {
   int buttonW, buttonH; // for the buttons
   int imageSize;
   int miscButtonW;
-  PGraphics[] presetThumbnails = new PGraphics[presets.length];
+  PGraphics[] presetThumbnails = new PGraphics[NUM_PRESETS];
   int presetY;
 
   // ===== Mini Constructor =====
@@ -45,16 +54,10 @@ class UIManager {
     controlH = controlHeight;
     spacer = controlH + betweenControls; 
     imageSize = (width - outerOffsetX - squareSize - innerOffset - betweenControls * 3 - outerOffsetX) / 4;
-    //miscButtonW = (width - outerOffsetX - squareSize - innerOffset - betweenControls * 5 - outerOffsetX) / 3; // this is just arbitrary
     miscButtonW = imageSize;
     
     buttonW = (width - outerOffsetX - outerOffsetX - squareSize - innerOffset) * 2 / 5;
     buttonH = buttonW / 2;
-    
-    // lineImg = drawThumbnail(line, imageSize);
-    // triangleImg = drawThumbnail(triangle, imageSize);
-    // circleImg = drawThumbnail(circle, imageSize);
-    // stampImg = drawThumbnail(stamp, imageSize);
     
     for (int i = 0; i < presetThumbnails.length; i++) {
       presetThumbnails[i] = drawThumbnail(presets[i], imageSize);
@@ -167,9 +170,23 @@ class UIManager {
       ;
   }
 
+
+  // syncs with the playbackManager to update the ui
   void syncUI() {
     setControllerValue("handleNormalize", playbackManager.useNormalized ? 1 : 0);
     setControllerValue("handleTogglePlayback", playbackManager.isPlaying() ? 1 : 0);
+
+    Slider sizeSlider = (Slider)cp5.getController("size");
+    sizeSlider.setBroadcast(false);
+    sizeSlider.setRange(0.1, min(2.0, playbackManager.maxSize));
+    sizeSlider.setValue(playbackManager.size);
+    sizeSlider.setBroadcast(true);
+
+    Slider angleSlider = (Slider)cp5.getController("angle");
+    angleSlider.setBroadcast(false);
+    angleSlider.setRange(playbackManager.minAngle, playbackManager.maxAngle);
+    angleSlider.setValue(playbackManager.angle);
+    angleSlider.setBroadcast(true);
   }
 
   void setControllerValue(String name, float val) {
@@ -179,42 +196,46 @@ class UIManager {
   }
   
   // draw
-  void draw(PVector latestPoint, Doodle currDoodle) {
+  void draw(Doodle currDoodle, PVector latestPoint, int sp) {
     drawDoodle(currDoodle);
-    if (latestPoint != null && systemState == State.PLAYBACK) {
+    // the buttons should reflect the state
+    syncUI(); 
+
+    if (latestPoint == null) {
+      return;
+    }
+
+    if (playbackManager.isPlaying() || playbackManager.isPaused()) {
       drawTip(latestPoint, 255); // with no transparency
     } else {
       drawTip(latestPoint, 50); // just the outline
     }
-    
-    // the buttons should reflect the state
-    syncUI();
 
-    highlightPreset();
+    highlightPreset(sp);
   }
 
   // Highlight preset
-  void highlightPreset() {
+  void highlightPreset(int sp) {
     stroke(0, 150, 255);   // Bright blue border
     strokeWeight(5);
     noFill();
 
     // Highlight custom preset
-    if (selectedPreset >= 0 && selectedPreset < 4) {
-      int x = controlX + (selectedPreset) * (imageSize + betweenControls);
+    if (sp >= 0 && sp < 4) {
+      int x = controlX + (sp) * (imageSize + betweenControls);
       int y = presetY;
       rect(x, y, imageSize, imageSize);
     }
 
     // Highlight default preset
-    if (selectedPreset >= 4 && selectedPreset < 8) {
-      int x = controlX + (selectedPreset-4) * (imageSize + betweenControls);
+    if (sp >= 4 && sp < 8) {
+      int x = controlX + (sp-4) * (imageSize + betweenControls);
       int y = outerOffsetY + spacer * 3 + betweenControls * 2 + font_size + betweenControls; // Same as buttonY
       rect(x, y, imageSize, imageSize);
     }
   }
 
-  // draws the drawing square, and the current doodle
+  // draws the drawing square and the current doodle, with whatever transformations
   void drawDoodle(Doodle currDoodle) {
     // drawing the background square
     stroke(0);
@@ -225,8 +246,9 @@ class UIManager {
     // drawing the doodle
     pushMatrix();
     translate(outerOffsetX, outerOffsetY);
-  
-    for (int strokeInd = 0; strokeInd < currDoodle.getStrokeCount(); strokeInd++) {
+    
+    int strokeInd = 0;
+    while (strokeInd < currDoodle.getStrokeCount()) {
       parent.stroke(0);
       parent.strokeWeight(5);
       noFill();
@@ -244,7 +266,8 @@ class UIManager {
           boolean penDown = abs(worldPos.z) < zEps;
     
           // Then flatten/transform only for drawing
-          PVector v2 = toSquareFromGrid(worldPos);
+          PVector transformedPos = playbackManager.applyTransformations(worldPos);
+          PVector v2 = toSquareFromGrid(transformedPos);
     
           if (penDown) {
             if (!drawing) {
@@ -266,6 +289,7 @@ class UIManager {
           endShape();
         }
       }
+      strokeInd++;
     }
     popMatrix();
   }

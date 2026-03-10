@@ -30,7 +30,7 @@ class Stroke {
   // Jump transition stroke
   Stroke(PVector start, PVector end) {
     isTransition = true;
-    buildTransition(start, end, 3); // parabola lift height (3mm)
+    buildTransition(start, end, 3); // parabola lift height default (3mm)
   }
 
   // Variable height transition stroke
@@ -97,8 +97,8 @@ class Stroke {
   
   // Build a transition stroke with smooth interpolation
   private void buildTransition(PVector start, PVector end, float h) {
-    // float transitionTime = start.dist(end) * 15 + 100;
-    float transitionTime = 1000;
+    float transitionTime = start.dist(end) * 15 + 50;
+    // float transitionTime = 1000;
     println("This transition will take: ", transitionTime);
 
     // float h = 3;      // parabola apex lift
@@ -234,36 +234,4 @@ class Doodle {
     }
     return copy;
   }
-
-  // TimedPoint applyTransformations(TimedPoint original) {
-  //   PVector originalPVector = original.pos;
-  //   PVector transformedPVector = originalPVector.copy();
-    
-  //   // Apply scaling
-  //   //println("size: ", size);
-  //   transformedPVector.mult(size);
-    
-  //   // Apply rotation
-  //   //println("orientation: ", angle);
-  //   // transformed.rotate(radians(-angle));
-    
-  //   TimedPoint transformed = new TimedPoint(transformedPVector, original.time);
-  //   return transformed;
-  // }
-  
-  // TimedPoint undoTransformations(TimedPoint original) {
-  //   PVector originalPVector = original.pos;
-  //   PVector untransformedPVector = originalPVector.copy();
-    
-  //   // Apply scaling
-  //   //println("size: ", size);
-  //   untransformedPVector.mult(size);
-    
-  //   // Apply rotation
-  //   //println("orientation: ", angle);
-  //   // transformed.rotate(radians(-angle));
-    
-  //   TimedPoint untransformed = new TimedPoint(untransformedPVector, original.time);
-  //   return untransformed;
-  // }
 }

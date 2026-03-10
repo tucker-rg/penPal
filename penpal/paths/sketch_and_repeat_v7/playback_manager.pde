@@ -1,11 +1,6 @@
 // -------------------
-// Top-level enums
+// Top-level enum
 // -------------------
-enum PlaybackMode {
-  PINGPONG, // NOT IMPLEMENTED
-  LOOP
-}
-
 enum PlaybackState {
   IDLE,
   PLAYING,
@@ -24,29 +19,26 @@ class PlaybackManager {
   private long    strokeStartTime     = 0;
   PlaybackState   state               = PlaybackState.IDLE;
   private long    pauseStartTime      = 0;
-  private PVector lastPoint           = new PVector(0, 0);
-
-  // -- PingPong state --
-  private boolean isReversing         = false;
+  private PVector lastPoint           = new PVector(0, 0); // the last point sent to the pen (transformed)
 
   // -- Transition state --
   private Stroke  transitionStroke       = null;
   private boolean isPlayingTransition    = false;
-  private int     transitionFinishAction = 0;
   private int     transitionTargetIndex  = 0;
-
-  final int TRANSITION_RESET   = 1;
-  final int TRANSITION_ADVANCE = 2;
 
   // -- Settings --
   private float     replaySpeed            = 1.0;
-  private float     normalizedTargetSpeed  = 0.05;
-  private int       angle                  = 0;
-  PlaybackMode      mode                   = PlaybackMode.LOOP;
-  private boolean   usePingPong            = false; // not implemented
-  boolean           useNormalized          = true;
-  private float     easingFactor           = 0.05;
-  private float     transitionGapThreshold = 0.5;
+  private float     normalizedTargetSpeed  = 0.05; // mm/ms, corresponding to a 1.0 replaySpeed
+  int       angle                  = 0; 
+  float     size                   = 1.0; 
+  boolean           useNormalized          = true; // Default to true, "motion smoothing"
+  private float     easingFactor           = 0.05; // I honestly forgot what this does
+  private float     transitionGapThreshold = 0.5; // Below this threshold, the pen will not "jump" to the next stroke, because it is already too close
+  
+  // -- Computed limits --
+  private float maxSize = MAX_FLOAT;
+  private int minAngle = -180; // these are actually offsets from the current angle
+  private int maxAngle = 180;
 
   // -- Doodles --
   Doodle doodleOriginal   = null;
@@ -64,57 +56,156 @@ class PlaybackManager {
   // =============================================================
   void play(Doodle d) {
     if (d == null || d.getCount() == 0) return;
-    setDoodle(d);
+    // setDoodle(d); now we do this as we draw, so that the transformations work in advance
     state = PlaybackState.PLAYING;
     resetAndReturn();
   }
 
   void pause() {
     if (state == PlaybackState.PLAYING) {
+      println("paused");
       state          = PlaybackState.PAUSED;
       pauseStartTime = parent.millis();
     }
   }
 
   void resume() {
+    println("Called resume");
     if (getCurrentDoodle() == null) return;
-    if (state == PlaybackState.PAUSED) {
+    if (state == PlaybackState.PLAYING) return;
+
+    if (state == PlaybackState.IDLE) {
+      state = PlaybackState.PLAYING;
+      startReturnToStart();
+    } else if (state == PlaybackState.PAUSED) {
       if (currentPointIndex == 0 && currentStrokeIndex == 0) {
         strokeStartTime = parent.millis();
       } else {
         strokeStartTime += (parent.millis() - pauseStartTime);
       }
       state = PlaybackState.PLAYING;
+      print("state is now PLAYING");
     }
   }
 
   void togglePauseResume() {
+    println("");
+    println("called togglePauseResume");
+    if (state == PlaybackState.IDLE) {
+      println("ITs IDLE");
+    }
+    println("");
     if (state == PlaybackState.PLAYING) pause();
     else resume();
   }
 
+  void clear(Doodle d) {
+    makeIdle();
+    setDoodle(d); // should be a clear doodle
+    // reset these settings whever we clear the doodle
+    size = 1.0;
+    angle = 0;
+  }
+
   void makeIdle() {
     state = PlaybackState.IDLE;
+    print("state is now IDLE");
   }
 
   void setDoodle(Doodle d) {
     if (d == null) return;
     doodleOriginal   = d;
     doodleNormalized = normalizer.getNormalizedDoodle(d, normalizedTargetSpeed, easingFactor);
-    mode = usePingPong ? PlaybackMode.PINGPONG : PlaybackMode.LOOP;
+    computeLimits();
   }
 
-  void setMode(PlaybackMode m) {
-    mode = m;
-    reset();
+  void computeLimits() {
+    maxSize  = computeMaxSize();
+    computeMaxAngles();
+  }
+
+  private float computeMaxSize() {
+    Doodle d = getCurrentDoodle();
+    if (d == null) return MAX_FLOAT;
+    float maxExtent = 0;
+
+    for (int i = 0; i < d.getStrokeCount(); i++) {
+      Stroke s = d.getStroke(i);
+      for (int j = 0; j < s.getCount(); j++) {
+        PVector p = applyAngle(s.getPointAtIndex(j).pos);
+        maxExtent = max(maxExtent, abs(p.x));
+        maxExtent = max(maxExtent, abs(p.y));
+      }
+    }
+
+    if (maxExtent == 0) return 2.0;
+    return 12.5 / maxExtent;
+  }
+
+  private void computeMaxAngles() {
+    // find max positive angle
+    maxAngle = 0;
+    for (int a = angle; a <= 180; a++) {
+      if (allPointsFit(size, a)) maxAngle = a;
+      else break;
+    }
+
+    // find min (most negative) angle
+    minAngle = 0;
+    for (int a = angle; a >= -180; a--) {
+      if (allPointsFit(size, a)) minAngle = a;
+      else break;
+    }
+  }
+
+  private boolean allPointsFit(float testSize, int testAngle) {
+    Doodle d = getCurrentDoodle();
+    if (d == null) return true;
+    float a    = radians(-testAngle);
+    float cosA = cos(a);
+    float sinA = sin(a);
+
+    for (int i = 0; i < d.getStrokeCount(); i++) {
+      Stroke s = d.getStroke(i);
+      for (int j = 0; j < s.getCount(); j++) {
+        PVector p = s.getPointAtIndex(j).pos;
+        float x  = p.x * testSize;
+        float y  = p.y * testSize;
+        float xr = x * cosA - y * sinA;
+        float yr = x * sinA + y * cosA;
+        if (abs(xr) > 12.5 || abs(yr) > 12.5) return false;
+      }
+    }
+    return true;
   }
 
   void setReplaySpeed(float speed) {
     float oldSpeed      = replaySpeed;
     replaySpeed         = max(0.01, speed);
+    if (isPlayingTransition) return; // transitions are unaffected by speed, no re-anchor needed
     float rawElapsed    = parent.millis() - strokeStartTime;
     float scaledElapsed = rawElapsed * oldSpeed;
     strokeStartTime     = (long)(parent.millis() - scaledElapsed / replaySpeed);
+  }
+
+  void setAngle(int a) {
+    angle   = constrain(a, minAngle, maxAngle);
+    maxSize = computeMaxSize();
+    if (state == PlaybackState.PAUSED) {
+      print("idle");
+      state = PlaybackState.IDLE;
+      print("state is now IDLE");
+    }
+  }
+
+  void setSize(float s) {
+    size = constrain(s, 0.01, maxSize);
+    computeMaxAngles();
+    if (state == PlaybackState.PAUSED) {
+      print("idle");
+      state = PlaybackState.IDLE;
+      print("state is now IDLE");
+    }
   }
 
   void swapUseNormalized() {
@@ -130,10 +221,8 @@ class PlaybackManager {
   void reset() {
     currentStrokeIndex     = 0;
     currentPointIndex      = 0;
-    isReversing            = false;
     isPlayingTransition    = false;
     transitionStroke       = null;
-    transitionFinishAction = 0;
     transitionTargetIndex  = 0;
     strokeStartTime        = parent.millis();
   }
@@ -147,6 +236,14 @@ class PlaybackManager {
     return state == PlaybackState.PLAYING;
   }
 
+  boolean isPaused() {
+    return state == PlaybackState.PAUSED;
+  }
+
+  boolean isIdle() {
+    return state == PlaybackState.IDLE;
+  }
+
   float getReplaySpeed() {
     return replaySpeed;
   }
@@ -154,42 +251,35 @@ class PlaybackManager {
   // =============================================================
   // Main update — call every frame
   // =============================================================
-  PVector update() {
+  PVector update() { // returns the current tip location
     if (state != PlaybackState.PLAYING) return lastPoint;
+
+    // --- Handle the jump-return transition stroke ---
     if (isPlayingTransition) {
-      PVector pt = updateTransition();
-      if (pt != null) lastPoint = pt;
+      PVector sendingPt = updateTransition();
+      lastPoint = applyTransformations(sendingPt);
       return lastPoint;
     }
 
     Doodle doodle = getCurrentDoodle();
-    if (doodle == null || doodle.getStrokeCount() == 0) return null;
+    if (doodle == null || doodle.getStrokeCount() == 0) return lastPoint;
 
-    // loop so that advancing a stroke immediately scans the next one
-    int safetyLimit = doodle.getStrokeCount() + 1;
-    while (safetyLimit-- > 0) {
-      Stroke stroke = doodle.getStroke(currentStrokeIndex);
-      if (stroke == null || stroke.getCount() == 0) {
-        advanceStroke(doodle);
-        if (isPlayingTransition) return lastPoint; // transition just started
-        continue;
-      }
-
-      float      elapsed = computeElapsed();
-      TimedPoint tp      = isReversing
-                            ? findPointForElapsedReverse(stroke, elapsed)
-                            : findPointForElapsed(stroke, elapsed);
-      if (tp != null) lastPoint = tp.pos;
-
-      if (elapsed >= stroke.getDuration()) {
-        advanceStroke(doodle);
-        if (isPlayingTransition) return lastPoint; // transition just started
-        continue; // immediately scan the new stroke
-      }
-
+    Stroke stroke = doodle.getStroke(currentStrokeIndex);
+    if (stroke == null || stroke.getCount() == 0) {
+      advanceStroke(doodle);
       return lastPoint;
     }
 
+    float     elapsed = computeElapsed();
+    TimedPoint tp     = findPointForElapsed(stroke, elapsed);
+    if (tp == null) return lastPoint;
+    
+    lastPoint = applyTransformations(tp.pos);   
+    
+    if (elapsed >= stroke.getDuration()) {
+      advanceStroke(doodle);
+    }
+    
     return lastPoint;
   }
 
@@ -197,16 +287,10 @@ class PlaybackManager {
   // Stroke advancement
   // =============================================================
   private void advanceStroke(Doodle doodle) {
-    if (isReversing) advanceStrokeReverse(doodle);
-    else             advanceStrokeForward(doodle);
-  }
-
-  private void advanceStrokeForward(Doodle doodle) {
     int nextIndex = currentStrokeIndex + 1;
 
     if (nextIndex >= doodle.getStrokeCount()) {
-      handlePlaybackEnd(doodle);
-      return;
+      nextIndex = 0;
     }
 
     Stroke currentStroke = doodle.getStroke(currentStrokeIndex);
@@ -215,58 +299,21 @@ class PlaybackManager {
 
     if (PVector.dist(endPos, startPos) > transitionGapThreshold) {
       transitionTargetIndex  = nextIndex;
-      transitionFinishAction = TRANSITION_ADVANCE;
       startTransition(endPos, startPos);
     } else {
       currentStrokeIndex = nextIndex;
       currentPointIndex  = 0;
       strokeStartTime    = strokeStartTime + (long)(currentStroke.getDuration() / replaySpeed);
-    }
-  }
-
-  private void advanceStrokeReverse(Doodle doodle) {
-    int nextIndex = currentStrokeIndex - 1;
-
-    if (nextIndex < 0) {
-      isReversing        = false;
-      currentStrokeIndex = 0;
-      currentPointIndex  = 0;
-      strokeStartTime    = parent.millis();
-      return;
-    }
-
-    Stroke currentStroke = doodle.getStroke(currentStrokeIndex);
-    PVector endPos   = currentStroke.getFirstPoint(); // reverse: we're at the start of this stroke
-    PVector startPos = doodle.getStroke(nextIndex).getLastPoint(); // heading to the end of the previous
-
-    if (PVector.dist(endPos, startPos) > transitionGapThreshold) {
-      transitionTargetIndex  = nextIndex;
-      transitionFinishAction = TRANSITION_ADVANCE;
-      startTransition(endPos, startPos);
-    } else {
-      currentStrokeIndex = nextIndex;
-      currentPointIndex  = doodle.getStroke(nextIndex).getCount() - 1;
-      strokeStartTime    = strokeStartTime + (long)(currentStroke.getDuration() / replaySpeed);
-    }
-  }
-
-  // =============================================================
-  // End-of-doodle handling
-  // =============================================================
-  private void handlePlaybackEnd(Doodle doodle) {
-    if (mode == PlaybackMode.PINGPONG) {
-      isReversing        = true;
-      currentStrokeIndex = doodle.getStrokeCount() - 1;
-      currentPointIndex  = doodle.getStroke(currentStrokeIndex).getCount() - 1;
-      strokeStartTime    = parent.millis();
-    } else {
-      resetAndReturn();
     }
   }
 
   // =============================================================
   // Transitions
   // =============================================================
+
+  // worth noting: all transitions are handled in grid space, and then transformed in update() before sending to the pen. 
+  // this means that transitions may become squeezed or otherwise as transformations change. 
+  // perhaps a later version could address this. 
   private void startTransition(PVector from, PVector dest) {
     transitionStroke    = new Stroke(from, dest);
     isPlayingTransition = true;
@@ -279,14 +326,17 @@ class PlaybackManager {
     if (d == null) return;
     PVector dest = d.getStroke(0).getPointAtIndex(0).pos;
     if (dest == null) return;
-    if (lastPoint.dist(dest) < transitionGapThreshold) {
+
+    PVector lastPointGrid = undoTransformations(lastPoint); // lastPoint stores the post-transformation last point, perhaps a different transformation than the current one.
+                                                            // therefore, lastPointGrid stores the grid point that transforms to lastPoint
+
+    if (lastPointGrid.dist(dest) < transitionGapThreshold) {
       print("no need to jump to return to start, already close enough");
       return;
     }
 
-    transitionStroke       = new Stroke(lastPoint, dest);
+    transitionStroke       = new Stroke(lastPointGrid, dest);
     isPlayingTransition    = true;
-    transitionFinishAction = TRANSITION_RESET;
     currentPointIndex      = 0;
     strokeStartTime        = parent.millis();
   }
@@ -298,7 +348,7 @@ class PlaybackManager {
     }
 
     float      elapsed = parent.millis() - strokeStartTime;
-    TimedPoint tp      = findPointForElapsedInStroke(transitionStroke, elapsed);
+    TimedPoint tp      = findPointForElapsed(transitionStroke, elapsed);
 
     if (elapsed >= transitionStroke.getDuration()) {
       finishTransition();
@@ -309,20 +359,11 @@ class PlaybackManager {
 
   private void finishTransition() {
     isPlayingTransition = false;
-
-    if (transitionFinishAction == TRANSITION_ADVANCE) {
-      long transitionDuration = (long)transitionStroke.getDuration();
-      transitionStroke       = null;
-      currentStrokeIndex     = transitionTargetIndex;
-      currentPointIndex      = 0;
-      transitionFinishAction = 0;
-      transitionTargetIndex  = 0;
-      strokeStartTime        = strokeStartTime + transitionDuration;
-    } else if (transitionFinishAction == TRANSITION_RESET) {
-      transitionStroke       = null;
-      transitionFinishAction = 0;
-      reset();
-    }
+    transitionStroke       = null;
+    currentStrokeIndex     = transitionTargetIndex;
+    currentPointIndex      = 0;
+    transitionTargetIndex  = 0;
+    strokeStartTime        = parent.millis();
   }
 
   // =============================================================
@@ -333,39 +374,23 @@ class PlaybackManager {
   }
 
   private TimedPoint findPointForElapsed(Stroke stroke, float elapsed) {
-    return findPointForElapsedInStroke(stroke, elapsed);
-  }
-
-  private TimedPoint findPointForElapsedInStroke(Stroke stroke, float elapsed) {
     TimedPoint result = null;
+
     for (int i = currentPointIndex; i < stroke.getCount(); i++) {
       TimedPoint tp = stroke.getPointAtIndex(i);
-      if (tp == null) continue;
+
       if (tp.time <= elapsed) {
-        result            = tp;
+        result = tp;
         currentPointIndex = i;
       } else {
         break;
       }
     }
-    return result;
-  }
 
-  private TimedPoint findPointForElapsedReverse(Stroke stroke, float elapsed) {
-    float      duration = stroke.getDuration();
-    TimedPoint result   = null;
-
-    for (int i = currentPointIndex; i >= 0; i--) {
-      TimedPoint tp = stroke.getPointAtIndex(i);
-      if (tp == null) continue;
-      float reversedTime = duration - tp.time;
-      if (reversedTime <= elapsed) {
-        result            = tp;
-        currentPointIndex = i;
-      } else {
-        break;
-      }
+    if (result == null && stroke.getCount() > 0) {
+      result = stroke.getPointAtIndex(0);
     }
+
     return result;
   }
 
@@ -378,7 +403,7 @@ class PlaybackManager {
     
     // Apply scaling
     //println("size: ", size);
-    // transformed.mult(size);
+    transformed.mult(size);
     
     // Apply rotation
     //println("orientation: ", angle);
@@ -386,12 +411,24 @@ class PlaybackManager {
     
     return transformed;
   }
+
+  PVector applyAngle(PVector original) {
+    PVector transformed = original.copy();
+    transformed.rotate(radians(-angle));
+    return transformed;
+  }
+
+  PVector applySize(PVector original) {
+    PVector transformed = original.copy();
+    transformed.mult(size);
+    return transformed;
+  }
   
   PVector undoTransformations(PVector transformed) {
     PVector original = transformed.copy();
     
     // Apply scaling
-    // original.mult(1 / size);
+    original.mult(1 / size);
     
     // Apply rotation
     original.rotate(radians(angle));
