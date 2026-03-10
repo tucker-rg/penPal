@@ -20,7 +20,7 @@ static enum State {
 
 // Pen communication
 Serial myPort;
-final boolean OFFLINE = true; // for testing purpose, otherwise set FALSE
+final boolean OFFLINE = false; // for testing purpose, otherwise set FALSE
 
 State systemState = State.DORMANT;
 ControlP5 cp5;
@@ -45,7 +45,7 @@ void setup() {
     println("setting up serial");
     // Serial setup
     printArray(Serial.list());
-    String portName = Serial.list()[0];  // Adjust index as needed
+    String portName = Serial.list()[3];  // Adjust index as needed
     myPort = new Serial(this, portName, 115200); //57600
     myPort.bufferUntil('\n');  // trigger serialEvent on newline
   }
@@ -71,8 +71,9 @@ void draw() {
   PVector newPoint = null;
 
   newPoint = playbackManager.update(); // get the latest point (playbackManager accounts for idle or paused)
-  if (!OFFLINE) {
-    motorCommand.sendMotorCommand(newPoint, 25.0, 0, 0, 0); // send the latest point
+  if (!OFFLINE && newPoint != null) {
+    motorCommand.sendMotorCommand(newPoint, 30.0); // send the latest point
+    // print(newPoint.x, newPoint.y, newPoint.z);
   }
 
   background(180);
@@ -169,7 +170,7 @@ void size(float s) {
 }
 
 void controlEvent(ControlEvent e) {
-  println("controlEvent fired: " + e.getName());
+  // println("controlEvent fired: " + e.getName());
 }
 
 

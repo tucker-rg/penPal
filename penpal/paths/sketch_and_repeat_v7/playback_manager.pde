@@ -58,7 +58,8 @@ class PlaybackManager {
     if (d == null || d.getCount() == 0) return;
     // setDoodle(d); now we do this as we draw, so that the transformations work in advance
     state = PlaybackState.PLAYING;
-    resetAndReturn();
+    reset();
+    startReturnToStart(0);
   }
 
   void pause() {
@@ -76,7 +77,7 @@ class PlaybackManager {
 
     if (state == PlaybackState.IDLE) {
       state = PlaybackState.PLAYING;
-      startReturnToStart();
+      startReturnToStart(0);
     } else if (state == PlaybackState.PAUSED) {
       if (currentPointIndex == 0 && currentStrokeIndex == 0) {
         strokeStartTime = parent.millis();
@@ -229,7 +230,7 @@ class PlaybackManager {
 
   void resetAndReturn() {
     reset();
-    startReturnToStart();
+    startReturnToStart(3);
   }
 
   boolean isPlaying() {
@@ -321,7 +322,7 @@ class PlaybackManager {
     strokeStartTime     = parent.millis();
   }
 
-  private void startReturnToStart() {
+  private void startReturnToStart(int h) { // specify the height of the transition
     Doodle d = getCurrentDoodle();
     if (d == null) return;
     PVector dest = d.getStroke(0).getPointAtIndex(0).pos;
@@ -335,7 +336,7 @@ class PlaybackManager {
       return;
     }
 
-    transitionStroke       = new Stroke(lastPointGrid, dest);
+    transitionStroke       = new Stroke(lastPointGrid, dest, h);
     isPlayingTransition    = true;
     currentPointIndex      = 0;
     strokeStartTime        = parent.millis();

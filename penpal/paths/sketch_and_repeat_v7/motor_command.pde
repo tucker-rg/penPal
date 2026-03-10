@@ -9,8 +9,35 @@ class MotorCommand {
   private Mapping map = new Mapping();
   
   MotorCommand() {}
-  
-  // sends grid coordinates to the pen
+
+  void sendMotorCommand(PVector cmd, float h) {
+    if (cmd == null) return;
+    
+    if (h <= 20) {
+      println("pen height too low");
+      return;
+    }
+
+    PVector transformedCmd = new PVector(cmd.x, cmd.y, h);
+    
+    float[] tendonLengths = map.getTendonLengths(transformedCmd);
+    if (tendonLengths == null) return;
+    
+    float[] motorPositions = getMotorPositions(tendonLengths);
+    if (motorPositions == null) return;
+
+    String data = String.format("0:%f,1:%f,2:%f\n",
+      motorPositions[0],
+      motorPositions[1],
+      motorPositions[2]);
+
+    if (!data.equals(lastCommand)) {
+      myPort.write(data);
+      lastCommand = data;
+    }
+  }
+
+  // sends grid coordinates to the pen w/ yaw pitch roll
   void sendMotorCommand(PVector cmd, float h, float y, float p, float r) {
     if (h <= 23.7) {
       println("pen height too low");

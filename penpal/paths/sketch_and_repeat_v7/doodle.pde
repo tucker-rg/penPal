@@ -117,7 +117,7 @@ class Stroke {
       float raw = pow(t, sharpness) * pow(1 - t, sharpness);
       float maxVal = pow(0.5, sharpness) * pow(0.5, sharpness);
       float lift = (raw / maxVal) * h;
-      float z = baseZ - lift;
+      float z = baseZ + lift; // NOT MINUS
 
       float time = t * transitionTime;
 
