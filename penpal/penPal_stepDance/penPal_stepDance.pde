@@ -47,12 +47,16 @@ void setup() {
     //println("setting up serial");
     // Serial setup
     printArray(Serial.list());
-    String penportName = Serial.list()[3];  // Adjust index as needed
-    //String stepPortName = Serial.list()[2];  // Adjust index as needed
-    penPort = new Serial(this, penportName, 115200);
-    penPort.bufferUntil('\n');  // trigger serialEvent on newline
-    //stepPort = new Serial(this, stepPortName, 115200);
-    //stepPort.bufferUntil('\n');  // trigger serialEvent on newline
+    
+    //Ilan: the block below is only needed if we are driving penPal on the same device
+    //String penportName = Serial.list()[3];  // Adjust index as needed
+    //penPort = new Serial(this, penportName, 115200);
+    //penPort.bufferUntil('\n');  // trigger serialEvent on newline
+    
+    //Ilan: we're specifying the port manually here:
+    String stepPortName = Serial.list()[2];  // Adjust index as needed
+    stepPort = new Serial(this, stepPortName, 115200);
+    stepPort.bufferUntil('\n');  // trigger serialEvent on newline
   }
 
   cp5 = new ControlP5(this);
@@ -79,24 +83,20 @@ void draw() {
   if (!OFFLINE && newPoint != null) {
     motorCommand.sendMotorCommand(newPoint, 30.0); // send the latest point
     
-    //Questions: 
+    //notes: 
     //penPal's grid is -12.5 to 12.5. Does this need to be translated here?
-    //1 step is 0.01mm in example. Do I need to do any mapping here?
-    //send as 3 newline-separated strings?
-    //am I touching the actual stepDance code, or just sending these out and letting Ilan do the stepDance part?
-    //figure out how to flag pen up pen down.
     float x = newPoint.x;
     float y = newPoint.y;
-    String deb = String.format("x: 0:%f, y: 1:%f",
+    String coords = String.format("x: 0:%f, y: 1:%f",
     x,
     y);
-    println(deb);
-    //String stepX = String.format("{\"name\": \"x_gen.go\", \"args\": [0:%f, 1, 100]}\n",
-    //  x);
-    //String stepY = String.format("{\"name\": \"y_gen.go\", \"args\": [0:%f, 1, 100]}\n",
-    //  y);
-    //stepPort.write(stepX);
-    //stepPort.write(stepY);
+    println(coords);
+    String stepX = String.format("{\"name\": \"x_gen.go\", \"args\": [0:%f, 1, 100]}\n",
+      x);
+    String stepY = String.format("{\"name\": \"y_gen.go\", \"args\": [0:%f, 1, 100]}\n",
+      y);
+    stepPort.write(stepX);
+    stepPort.write(stepY);
   }
 
   background(180);
