@@ -11,3 +11,4 @@ Note that this does not contain full documentation of how to build a working cop
 /paths contains everything related to the image--> servo command pipeline
 /Arduino_code contains everything running on the pen MCU
 /3D_models contains .STLs of printable hardware components.
+/GUI contains the Processing interfaces. penPal_stepDance is the current version; older versions are in GUI/archive.
